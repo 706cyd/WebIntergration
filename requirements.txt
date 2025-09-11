@@ -1,0 +1,10 @@
+Flask>=2.3.3
+Flask-SocketIO>=5.3.6
+FMPy>=0.3.18
+python-socketio>=5.8.0
+eventlet>=0.33.3
+numpy>=1.26.0
+SQLAlchemy>=2.0.0
+psycopg2-binary>=2.9.0
+flask-sock>=0.7.0
+simple-websocket>=1.0.0
