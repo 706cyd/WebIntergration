@@ -516,3 +516,15 @@ function showSessionStats(sessionId) {
         cncClient.fetchSessionStats(sessionId);
     }
 }
+
+// ===== Unity 画布比例切换 =====
+function setUnityAspect(mode) {
+    const box = document.getElementById('unityContainer');
+    if (!box) return;
+    box.classList.remove('aspect-square', 'aspect-16-9');
+    if (mode === 'square') {
+        box.classList.add('aspect-square');
+    } else {
+        box.classList.add('aspect-16-9');
+    }
+}
