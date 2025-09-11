@@ -528,3 +528,753 @@ function setUnityAspect(mode) {
         box.classList.add('aspect-16-9');
     }
 }
+
+// ===== 圆度测试功能 =====
+let currentRoundnessSession = null;
+
+function startRoundnessTest() {
+    if (!cncClient || !cncClient.socket) {
+        alert('WebSocket未连接');
+        return;
+    }
+
+    // 获取配置参数
+    const config = {
+        circle_center_x: parseFloat(document.getElementById('centerX').value) || 0.0,
+        circle_center_y: parseFloat(document.getElementById('centerY').value) || 0.0,
+        circle_radius: parseFloat(document.getElementById('circleRadius').value) || 10.0,
+        feedrate: parseFloat(document.getElementById('feedRate').value) || 100.0,
+        direction: parseInt(document.getElementById('direction').value) || 1,
+        n_circles: parseFloat(document.getElementById('circleCount').value) || 2.0,
+        step_size: parseFloat(document.getElementById('stepSize').value) || 0.001,
+        settling_time: parseFloat(document.getElementById('settlingTime').value) || 1.0
+    };
+
+    // 先应用FMU参数
+    applyFmuParameters();
+
+    // 启动圆轨迹仿真
+    cncClient.log('开始圆度测试...', 'info');
+    
+    // 发送自定义圆度测试指令
+    cncClient.socket.emit('start_roundness_test', config);
+    
+    // 更新UI状态
+    document.getElementById('stopRoundnessBtn').disabled = false;
+    document.querySelector('button[onclick="startRoundnessTest()"]').disabled = true;
+    
+    cncClient.log(`圆度测试配置: 半径=${config.circle_radius}mm, 进给=${config.feedrate}mm/s`, 'success');
+}
+
+function stopRoundnessTest() {
+    if (!cncClient || !cncClient.socket) return;
+    
+    cncClient.socket.emit('stop_simulation');
+    cncClient.log('停止圆度测试', 'warning');
+    
+    // 更新UI状态
+    document.getElementById('stopRoundnessBtn').disabled = true;
+    document.querySelector('button[onclick="startRoundnessTest()"]').disabled = false;
+    
+    // 延迟获取结果
+    setTimeout(() => {
+        refreshRoundnessResults();
+    }, 2000);
+}
+
+function applyFmuParameters() {
+    const params = {
+        Kv_x: parseFloat(document.getElementById('kvX').value) || 1200,
+        Kv_y: parseFloat(document.getElementById('kvY').value) || 1200,
+        Kp_x: parseFloat(document.getElementById('kpX').value) || 10,
+        Kp_y: parseFloat(document.getElementById('kpY').value) || 10
+    };
+
+    fetch('/api/fmu/parameters', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            params: params,
+            reinitialize: true
+        })
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            cncClient.log(`FMU参数已应用: Kv_x=${params.Kv_x}, Kv_y=${params.Kv_y}, Kp_x=${params.Kp_x}, Kp_y=${params.Kp_y}`, 'success');
+        } else {
+            cncClient.log(`FMU参数应用失败: ${result.error}`, 'error');
+        }
+    })
+    .catch(error => {
+        cncClient.log(`FMU参数应用异常: ${error.message}`, 'error');
+    });
+}
+
+function refreshRoundnessResults() {
+    // 获取最新会话的圆度分析结果
+    fetch('/api/sessions')
+        .then(response => response.json())
+        .then(result => {
+            if (result.success && result.sessions && result.sessions.length > 0) {
+                const latestSession = result.sessions[0];
+                return fetch(`/api/sessions/${latestSession.id}/roundness`);
+            }
+            throw new Error('No sessions found');
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success && result.metrics) {
+                displayRoundnessResults(result.metrics);
+            } else {
+                throw new Error(result.error || 'Failed to get roundness metrics');
+            }
+        })
+        .catch(error => {
+            cncClient.log(`获取圆度结果失败: ${error.message}`, 'error');
+            document.getElementById('roundnessResults').innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    暂无圆度分析结果，请先运行测试
+                </div>
+            `;
+        });
+}
+
+function displayRoundnessResults(metrics) {
+    const container = document.getElementById('roundnessResults');
+    const roundnessError = (metrics.roundness_error * 1000).toFixed(2); // 转换为微米
+    const radius = metrics.radius.toFixed(3);
+    const centerX = metrics.center_x.toFixed(3);
+    const centerY = metrics.center_y.toFixed(3);
+    const maxDev = (metrics.deviation_max * 1000).toFixed(2);
+    const minDev = (metrics.deviation_min * 1000).toFixed(2);
+
+    container.innerHTML = `
+        <div class="row g-3">
+            <div class="col-6">
+                <div class="card bg-primary text-white">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">圆度误差</h5>
+                        <h3>${roundnessError} μm</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="card bg-success text-white">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">拟合半径</h5>
+                        <h3>${radius} mm</h3>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="card bg-info text-white">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">圆心坐标</h5>
+                        <h4>(${centerX}, ${centerY})</h4>
+                    </div>
+                </div>
+            </div>
+            <div class="col-6">
+                <div class="card bg-warning text-white">
+                    <div class="card-body text-center">
+                        <h5 class="card-title">偏差范围</h5>
+                        <h4>${minDev} ~ ${maxDev} μm</h4>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="mt-3">
+            <div class="row text-center">
+                <div class="col-4">
+                    <strong>精度等级:</strong> 
+                    <span class="badge ${getRoundnessGrade(parseFloat(roundnessError)).class}">
+                        ${getRoundnessGrade(parseFloat(roundnessError)).grade}
+                    </span>
+                </div>
+                <div class="col-4">
+                    <strong>数据点数:</strong> ${metrics.n_points || 'N/A'}
+                </div>
+                <div class="col-4">
+                    <strong>分析时间:</strong> ${new Date().toLocaleTimeString()}
+                </div>
+            </div>
+        </div>
+    `;
+
+    // 更新历史表格
+    updateRoundnessHistory();
+}
+
+function getRoundnessGrade(errorMicrons) {
+    if (errorMicrons <= 1) return { grade: 'IT1 (极高精度)', class: 'bg-success' };
+    if (errorMicrons <= 2.5) return { grade: 'IT2 (高精度)', class: 'bg-primary' };
+    if (errorMicrons <= 6) return { grade: 'IT3 (精密)', class: 'bg-info' };
+    if (errorMicrons <= 10) return { grade: 'IT4 (良好)', class: 'bg-warning' };
+    return { grade: 'IT5+ (一般)', class: 'bg-danger' };
+}
+
+function updateRoundnessHistory() {
+    fetch('/api/sessions')
+        .then(response => response.json())
+        .then(result => {
+            if (result.success && result.sessions) {
+                const tbody = document.getElementById('roundnessHistoryTable');
+                if (result.sessions.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" class="text-muted">暂无历史数据</td></tr>';
+                    return;
+                }
+                
+                tbody.innerHTML = result.sessions.slice(0, 10).map(session => `
+                    <tr>
+                        <td>${session.id}</td>
+                        <td><span class="text-muted">计算中...</span></td>
+                        <td>${session.start_time || '-'}</td>
+                        <td>
+                            <button class="btn btn-sm btn-outline-primary" onclick="viewSessionRoundness(${session.id})">
+                                查看
+                            </button>
+                        </td>
+                    </tr>
+                `).join('');
+
+                // 异步获取每个会话的圆度数据
+                result.sessions.slice(0, 5).forEach(session => {
+                    fetch(`/api/sessions/${session.id}/roundness`)
+                        .then(r => r.json())
+                        .then(res => {
+                            if (res.success && res.metrics) {
+                                const errorMicrons = (res.metrics.roundness_error * 1000).toFixed(2);
+                                const cell = tbody.querySelector(`tr:has(td:first-child:contains("${session.id}")) td:nth-child(2)`);
+                                if (cell) {
+                                    cell.innerHTML = `${errorMicrons} μm`;
+                                }
+                            }
+                        })
+                        .catch(() => {});
+                });
+            }
+        })
+        .catch(error => {
+            cncClient.log(`获取历史数据失败: ${error.message}`, 'error');
+        });
+}
+
+function viewSessionRoundness(sessionId) {
+    fetch(`/api/sessions/${sessionId}/roundness`)
+        .then(response => response.json())
+        .then(result => {
+            if (result.success && result.metrics) {
+                displayRoundnessResults(result.metrics);
+                cncClient.log(`已加载会话 ${sessionId} 的圆度分析结果`, 'success');
+            } else {
+                cncClient.log(`会话 ${sessionId} 圆度分析失败: ${result.error}`, 'error');
+            }
+        })
+        .catch(error => {
+            cncClient.log(`获取会话 ${sessionId} 圆度数据失败: ${error.message}`, 'error');
+        });
+}
+
+// ===== 贝叶斯优化功能 =====
+let currentOptimizationTasks = {};
+
+function createOptimizationTask() {
+    const taskName = document.getElementById('taskName').value.trim();
+    if (!taskName) {
+        alert('请输入任务名称');
+        return;
+    }
+
+    const config = {
+        task_name: taskName + new Date().toISOString().slice(11, 19),
+        objective_type: document.getElementById('objectiveType').value,
+        acquisition_function: document.getElementById('acquisitionFunction').value,
+        n_initial_points: parseInt(document.getElementById('nInitialPoints').value),
+        max_iterations: parseInt(document.getElementById('maxIterations').value),
+        convergence_threshold: parseFloat(document.getElementById('convergenceThreshold').value),
+        patience: parseInt(document.getElementById('patience').value),
+        parameter_space_config: {
+            Kv_x: { type: "continuous", bounds: [500, 2000], unit: "1/s" },
+            Kv_y: { type: "continuous", bounds: [500, 2000], unit: "1/s" },
+            Kp_x: { type: "continuous", bounds: [1, 20], unit: "1" },
+            Kp_y: { type: "continuous", bounds: [1, 20], unit: "1" }
+        },
+        experiment_config: {
+            circle_radius: parseFloat(document.getElementById('circleRadius')?.value) || 10.0,
+            feedrate: parseFloat(document.getElementById('feedRate')?.value) || 100.0,
+            step_size: 0.001,
+            settling_time: 1.0
+        }
+    };
+
+    cncClient.log('创建优化任务...', 'info');
+
+    fetch('/api/optimization/tasks', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(config)
+    })
+    .then(response => response.json())
+    .then(result => {
+        if (result.success) {
+            cncClient.log(`优化任务创建成功: ID ${result.task_id}`, 'success');
+            refreshOptimizationTasks();
+            // 清空任务名称输入框
+            document.getElementById('taskName').value = '';
+        } else {
+            cncClient.log(`优化任务创建失败: ${result.error}`, 'error');
+        }
+    })
+    .catch(error => {
+        cncClient.log(`优化任务创建异常: ${error.message}`, 'error');
+    });
+}
+
+function refreshOptimizationTasks() {
+    fetch('/api/optimization/tasks')
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                displayOptimizationTasks(result.data);
+            } else {
+                cncClient.log(`获取优化任务失败: ${result.error}`, 'error');
+            }
+        })
+        .catch(error => {
+            cncClient.log(`获取优化任务异常: ${error.message}`, 'error');
+        });
+}
+
+function displayOptimizationTasks(tasks) {
+    const container = document.getElementById('optimizationTasks');
+    
+    if (!tasks || tasks.length === 0) {
+        container.innerHTML = `
+            <div class="text-center text-muted">
+                <i class="fas fa-info-circle"></i>
+                <p>暂无优化任务</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = tasks.map(task => {
+        const progress = task.progress;
+        const statusClass = getTaskStatusClass(task.status);
+        const progressPercent = progress.total_iterations > 0 ? 
+            (progress.current_iteration / progress.total_iterations * 100).toFixed(1) : 0;
+
+        return `
+            <div class="card mb-2">
+                <div class="card-body p-3">
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <h6 class="card-title mb-1">${task.task_name}</h6>
+                            <small class="text-muted">${task.config.objective_type}</small>
+                        </div>
+                        <span class="badge ${statusClass}">${getTaskStatusText(task.status)}</span>
+                    </div>
+                    
+                    <div class="mt-2">
+                        <div class="progress mb-2" style="height: 6px;">
+                            <div class="progress-bar" style="width: ${progressPercent}%"></div>
+                        </div>
+                        <div class="row small text-muted">
+                            <div class="col-6">进度: ${progress.current_iteration}/${progress.total_iterations}</div>
+                            <div class="col-6 text-end">
+                                ${progress.best_objective_value ? 
+                                    (progress.best_objective_value * 1000).toFixed(2) + ' μm' : 
+                                    '-'}
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="mt-2 d-flex gap-1">
+                        ${task.status === 'pending' ? 
+                            `<button class="btn btn-sm btn-success" onclick="startOptimizationTask(${task.task_id})">启动</button>` : ''}
+                        ${task.status === 'running' ? 
+                            `<button class="btn btn-sm btn-warning" onclick="pauseOptimizationTask(${task.task_id})">暂停</button>` : ''}
+                        ${task.status === 'paused' ? 
+                            `<button class="btn btn-sm btn-info" onclick="resumeOptimizationTask(${task.task_id})">恢复</button>` : ''}
+                        <button class="btn btn-sm btn-outline-danger" onclick="stopOptimizationTask(${task.task_id})">停止</button>
+                        <button class="btn btn-sm btn-outline-primary" onclick="viewOptimizationDetails(${task.task_id})">详情</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    // 存储当前任务状态
+    currentOptimizationTasks = {};
+    tasks.forEach(task => {
+        currentOptimizationTasks[task.task_id] = task;
+    });
+}
+
+function getTaskStatusClass(status) {
+    const classes = {
+        pending: 'bg-secondary',
+        running: 'bg-primary',
+        paused: 'bg-warning',
+        completed: 'bg-success',
+        failed: 'bg-danger',
+        cancelled: 'bg-dark'
+    };
+    return classes[status] || 'bg-secondary';
+}
+
+function getTaskStatusText(status) {
+    const texts = {
+        pending: '等待中',
+        running: '运行中',
+        paused: '已暂停',
+        completed: '已完成',
+        failed: '失败',
+        cancelled: '已取消'
+    };
+    return texts[status] || status;
+}
+
+function startOptimizationTask(taskId) {
+    fetch(`/api/optimization/tasks/${taskId}/start`, { method: 'POST' })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                cncClient.log(`优化任务 ${taskId} 启动成功`, 'success');
+                refreshOptimizationTasks();
+            } else {
+                cncClient.log(`优化任务 ${taskId} 启动失败: ${result.error}`, 'error');
+            }
+        })
+        .catch(error => {
+            cncClient.log(`启动优化任务异常: ${error.message}`, 'error');
+        });
+}
+
+function pauseOptimizationTask(taskId) {
+    fetch(`/api/optimization/tasks/${taskId}/pause`, { method: 'POST' })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                cncClient.log(`优化任务 ${taskId} 已暂停`, 'warning');
+                refreshOptimizationTasks();
+            } else {
+                cncClient.log(`暂停优化任务失败: ${result.error}`, 'error');
+            }
+        })
+        .catch(error => {
+            cncClient.log(`暂停优化任务异常: ${error.message}`, 'error');
+        });
+}
+
+function resumeOptimizationTask(taskId) {
+    fetch(`/api/optimization/tasks/${taskId}/resume`, { method: 'POST' })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                cncClient.log(`优化任务 ${taskId} 已恢复`, 'info');
+                refreshOptimizationTasks();
+            } else {
+                cncClient.log(`恢复优化任务失败: ${result.error}`, 'error');
+            }
+        })
+        .catch(error => {
+            cncClient.log(`恢复优化任务异常: ${error.message}`, 'error');
+        });
+}
+
+function stopOptimizationTask(taskId) {
+    if (!confirm('确定要停止这个优化任务吗？')) return;
+    
+    fetch(`/api/optimization/tasks/${taskId}/stop`, { method: 'POST' })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                cncClient.log(`优化任务 ${taskId} 已停止`, 'warning');
+                refreshOptimizationTasks();
+            } else {
+                cncClient.log(`停止优化任务失败: ${result.error}`, 'error');
+            }
+        })
+        .catch(error => {
+            cncClient.log(`停止优化任务异常: ${error.message}`, 'error');
+        });
+}
+
+function viewOptimizationDetails(taskId) {
+    const task = currentOptimizationTasks[taskId];
+    if (!task) return;
+
+    const card = document.getElementById('currentTaskCard');
+    const details = document.getElementById('currentTaskDetails');
+    
+    const progress = task.progress;
+    const config = task.config;
+    
+    details.innerHTML = `
+        <h6>任务信息</h6>
+        <table class="table table-sm">
+            <tr><td>任务ID</td><td>${task.task_id}</td></tr>
+            <tr><td>任务名称</td><td>${task.task_name}</td></tr>
+            <tr><td>状态</td><td><span class="badge ${getTaskStatusClass(task.status)}">${getTaskStatusText(task.status)}</span></td></tr>
+            <tr><td>目标函数</td><td>${config.objective_type}</td></tr>
+            <tr><td>采集函数</td><td>${config.acquisition_function}</td></tr>
+        </table>
+        
+        <h6>进度信息</h6>
+        <table class="table table-sm">
+            <tr><td>当前迭代</td><td>${progress.current_iteration}/${progress.total_iterations}</td></tr>
+            <tr><td>最佳目标值</td><td>${progress.best_objective_value ? (progress.best_objective_value * 1000).toFixed(3) + ' μm' : '-'}</td></tr>
+            <tr><td>已用时间</td><td>${progress.elapsed_time ? (progress.elapsed_time / 60).toFixed(1) + ' 分钟' : '-'}</td></tr>
+            <tr><td>预计剩余</td><td>${progress.estimated_remaining_time ? (progress.estimated_remaining_time / 60).toFixed(1) + ' 分钟' : '-'}</td></tr>
+        </table>
+        
+        ${progress.best_parameters ? `
+            <h6>最佳参数</h6>
+            <table class="table table-sm">
+                ${Object.entries(progress.best_parameters).map(([key, value]) => 
+                    `<tr><td>${key}</td><td>${Number(value).toFixed(3)}</td></tr>`
+                ).join('')}
+            </table>
+        ` : ''}
+    `;
+    
+    card.style.display = 'block';
+}
+
+function loadPresetConfig(type) {
+    const presets = {
+        precision: {
+            nInitialPoints: 8,
+            maxIterations: 100,
+            convergenceThreshold: 0.0000001,
+            patience: 8,
+            acquisitionFunction: 'expected_improvement'
+        },
+        speed: {
+            nInitialPoints: 3,
+            maxIterations: 30,
+            convergenceThreshold: 0.00001,
+            patience: 3,
+            acquisitionFunction: 'upper_confidence_bound'
+        },
+        balanced: {
+            nInitialPoints: 5,
+            maxIterations: 50,
+            convergenceThreshold: 0.000001,
+            patience: 5,
+            acquisitionFunction: 'expected_improvement'
+        }
+    };
+
+    const preset = presets[type];
+    if (!preset) return;
+
+    document.getElementById('nInitialPoints').value = preset.nInitialPoints;
+    document.getElementById('maxIterations').value = preset.maxIterations;
+    document.getElementById('convergenceThreshold').value = preset.convergenceThreshold;
+    document.getElementById('patience').value = preset.patience;
+    document.getElementById('acquisitionFunction').value = preset.acquisitionFunction;
+
+    cncClient.log(`已加载${type === 'precision' ? '高精度' : type === 'speed' ? '快速' : '平衡'}配置`, 'success');
+}
+
+// ===== 数据分析功能 =====
+function performAnalysis() {
+    const sessionId = document.getElementById('sessionFilter').value;
+    const timeRange = document.getElementById('timeRangeFilter').value;
+    const analysisType = document.getElementById('analysisType').value;
+
+    cncClient.log(`开始${analysisType}分析...`, 'info');
+
+    if (analysisType === 'roundness') {
+        performRoundnessAnalysis(sessionId, timeRange);
+    } else if (analysisType === 'trajectory') {
+        performTrajectoryAnalysis(sessionId, timeRange);
+    } else if (analysisType === 'statistics') {
+        performStatisticsAnalysis(sessionId);
+    } else if (analysisType === 'comparison') {
+        performComparisonAnalysis();
+    }
+}
+
+function performRoundnessAnalysis(sessionId, timeRange) {
+    if (!sessionId) {
+        alert('请选择要分析的会话');
+        return;
+    }
+
+    const url = `/api/sessions/${sessionId}/roundness${timeRange ? `?time_range=${timeRange}` : ''}`;
+    
+    fetch(url)
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                displayRoundnessAnalysisResults(result.metrics, sessionId);
+            } else {
+                throw new Error(result.error);
+            }
+        })
+        .catch(error => {
+            cncClient.log(`圆度分析失败: ${error.message}`, 'error');
+        });
+}
+
+function displayRoundnessAnalysisResults(metrics, sessionId) {
+    const container = document.getElementById('analysisResults');
+    const roundnessError = (metrics.roundness_error * 1000).toFixed(3);
+    const grade = getRoundnessGrade(parseFloat(roundnessError));
+
+    container.innerHTML = `
+        <div class="analysis-report">
+            <h4><i class="fas fa-circle"></i> 圆度分析报告</h4>
+            <p class="text-muted">会话ID: ${sessionId} | 分析时间: ${new Date().toLocaleString()}</p>
+            
+            <div class="row mb-4">
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="text-primary">${roundnessError} μm</h5>
+                            <p class="card-text">圆度误差</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="text-success">${metrics.radius.toFixed(3)} mm</h5>
+                            <p class="card-text">拟合半径</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <h5 class="text-info">(${metrics.center_x.toFixed(3)}, ${metrics.center_y.toFixed(3)})</h5>
+                            <p class="card-text">圆心坐标</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="col-md-3">
+                    <div class="card text-center">
+                        <div class="card-body">
+                            <span class="badge ${grade.class} fs-6">${grade.grade}</span>
+                            <p class="card-text">精度等级</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <h5>详细指标</h5>
+                    <table class="table table-striped">
+                        <tr><td>最大偏差</td><td>${(metrics.deviation_max * 1000).toFixed(3)} μm</td></tr>
+                        <tr><td>最小偏差</td><td>${(metrics.deviation_min * 1000).toFixed(3)} μm</td></tr>
+                        <tr><td>偏差范围</td><td>${((metrics.deviation_max - metrics.deviation_min) * 1000).toFixed(3)} μm</td></tr>
+                        <tr><td>数据点数</td><td>${metrics.n_points || 'N/A'}</td></tr>
+                    </table>
+                </div>
+                <div class="col-md-6">
+                    <h5>质量评估</h5>
+                    <div class="alert alert-info">
+                        <h6>分析结论</h6>
+                        <p>根据圆度误差 ${roundnessError} μm，该加工精度达到 <strong>${grade.grade}</strong> 水平。</p>
+                        ${parseFloat(roundnessError) <= 5 ? 
+                            '<p class="text-success">✓ 加工质量优秀，满足高精度要求</p>' :
+                            parseFloat(roundnessError) <= 10 ?
+                            '<p class="text-warning">⚠ 加工质量良好，可进一步优化</p>' :
+                            '<p class="text-danger">✗ 加工质量需要改进，建议调整参数</p>'
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function exportData(format) {
+    const sessionId = document.getElementById('sessionFilter').value;
+    if (!sessionId) {
+        alert('请选择要导出的会话');
+        return;
+    }
+
+    const url = `/api/sessions/${sessionId}/export?format=${format}`;
+    window.open(url, '_blank');
+    cncClient.log(`导出${format.toUpperCase()}数据: 会话${sessionId}`, 'success');
+}
+
+function saveAnalysisReport() {
+    const content = document.getElementById('analysisResults').innerHTML;
+    const blob = new Blob([`
+        <!DOCTYPE html>
+        <html><head><title>圆度分析报告</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        </head><body class="container mt-4">${content}</body></html>
+    `], { type: 'text/html' });
+    
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `圆度分析报告_${new Date().toISOString().slice(0, 19).replace(/:/g, '-')}.html`;
+    a.click();
+    URL.revokeObjectURL(url);
+    
+    cncClient.log('分析报告已保存', 'success');
+}
+
+function printAnalysisReport() {
+    const content = document.getElementById('analysisResults').innerHTML;
+    const printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <!DOCTYPE html>
+        <html><head><title>圆度分析报告</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+        <style>@media print { .no-print { display: none; } }</style>
+        </head><body class="container mt-4">${content}</body></html>
+    `);
+    printWindow.document.close();
+    printWindow.print();
+    
+    cncClient.log('打印分析报告', 'info');
+}
+
+// 页面加载完成后初始化
+document.addEventListener('DOMContentLoaded', function() {
+    // 定期刷新优化任务状态
+    setInterval(() => {
+        if (document.getElementById('optimization-panel').classList.contains('active')) {
+            refreshOptimizationTasks();
+        }
+    }, 10000);
+
+    // 填充会话选择器
+    fetch('/api/sessions')
+        .then(response => response.json())
+        .then(result => {
+            if (result.success && result.sessions) {
+                const select = document.getElementById('sessionFilter');
+                result.sessions.forEach(session => {
+                    const option = document.createElement('option');
+                    option.value = session.id;
+                    option.textContent = `会话${session.id} - ${session.session_name || '未命名'}`;
+                    select.appendChild(option);
+                });
+            }
+        })
+        .catch(error => console.error('Failed to load sessions:', error));
+
+    // 自动生成任务名称
+    const taskNameInput = document.getElementById('taskName');
+    if (taskNameInput && !taskNameInput.value) {
+        taskNameInput.value = '圆度优化_';
+    }
+});

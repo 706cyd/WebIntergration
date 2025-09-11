@@ -16,7 +16,6 @@ import traceback
 
 from .bayesian import BayesianOptimizer, ParameterSpace, ObjectiveFunction, AcquisitionType, create_parameter_space
 from .experiment import ExperimentConfig, run_optimization_experiment
-from simulator.fmu_simulator import CNCMachineSimulator
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +64,7 @@ class OptimizationTask:
     def __init__(self, 
                  task_id: int,
                  config: OptimizationTaskConfig,
-                 simulator: CNCMachineSimulator,
+                 simulator,  # CNCMachineSimulator instance
                  db_path: str = "simulation_data.db"):
         self.task_id = task_id
         self.config = config
@@ -355,7 +354,7 @@ class OptimizationTaskManager:
     """优化任务管理器"""
     
     def __init__(self, 
-                 simulator: CNCMachineSimulator,
+                 simulator,  # CNCMachineSimulator instance
                  db_path: str = "simulation_data.db",
                  max_concurrent_tasks: int = 2):
         self.simulator = simulator

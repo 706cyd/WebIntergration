@@ -13,7 +13,6 @@ import sqlite3
 from pathlib import Path
 
 # 本地模块
-from simulator.fmu_simulator import CNCMachineSimulator
 from analysis.roundness import analyze_session_roundness, compute_roundness_metrics
 
 logger = logging.getLogger(__name__)
@@ -104,7 +103,7 @@ class CircleTrajectoryExperiment:
     """圆轨迹实验执行器"""
     
     def __init__(self, 
-                 simulator: CNCMachineSimulator,
+                 simulator,  # CNCMachineSimulator instance
                  config: ExperimentConfig,
                  db_path: str = "simulation_data.db"):
         self.simulator = simulator
@@ -459,7 +458,7 @@ class CircleTrajectoryExperiment:
                 additional_metrics={'error': str(e)}
             )
 
-def run_optimization_experiment(simulator: CNCMachineSimulator,
+def run_optimization_experiment(simulator,  # CNCMachineSimulator instance
                               parameters: Dict[str, Any],
                               config: Optional[ExperimentConfig] = None) -> float:
     """运行优化实验并返回目标函数值（圆度误差）
