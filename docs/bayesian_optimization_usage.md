@@ -355,3 +355,48 @@ if __name__ == "__main__":
 3. 获得数据驱动的最优参数配置
 4. 大幅提升机床加工精度
 
+
+
+1. 圆度计算核心算法 (analysis/roundness.py)
+✅ 最小二乘圆拟合：使用Kåsa法进行代数最小二乘拟合
+✅ 径向偏差计算：计算实际轨迹点到拟合圆的径向偏差
+✅ 圆度误差指标：计算最大偏差-最小偏差作为圆度误差
+✅ 综合指标输出：圆心坐标、半径、圆度误差、偏差范围等
+2. 轨迹生成与实验执行 (optimization/experiment.py)
+✅ 圆轨迹生成器：可配置圆心、半径、进给速度、方向
+✅ 仿真参数控制：步长、稳定时间、采样率等
+✅ 数据质量评估：自动评估仿真数据的有效性
+🚀 贝叶斯优化功能
+1. 优化算法核心 (optimization/bayesian.py)
+✅ 高斯过程回归：使用scikit-learn的GaussianProcessRegressor
+✅ 多种采集函数：
+Expected Improvement (期望改善)
+Probability of Improvement (改善概率)
+Upper Confidence Bound (置信上界)
+✅ 参数空间管理：支持连续、离散、分类参数
+✅ 拉丁超立方采样：初始点的高质量分布
+2. 任务管理系统 (optimization/task_manager.py)
+✅ 异步任务执行：支持多任务并发优化
+✅ 状态跟踪：pending、running、paused、completed等状态
+✅ 进度监控：实时跟踪优化进度和最佳结果
+✅ 数据持久化：优化历史和结果自动保存到数据库
+
+完整的优化流程
+1. 参数优化目标
+2. 优化流程
+参数设置 → 将贝叶斯优化建议的参数应用到FMU仿真器
+轨迹仿真 → 执行圆轨迹仿真，记录X-Y位置数据
+圆度分析 → 对仿真轨迹进行圆拟合和圆度误差计算
+结果反馈 → 将圆度误差作为目标函数值反馈给优化器
+迭代优化 → 重复上述过程直到找到最优参数
+3. 理想结果输出
+✅ 最优参数组合：经过优化的控制器参数
+✅ 最小圆度误差：达到的最佳圆度精度（μm级）
+✅ 优化历史：完整的优化过程记录
+✅ 性能指标：收敛速度、评估次数、数据质量等
+🎯 API接口完整支持
+项目提供了完整的REST API接口：
+/api/optimization/tasks - 创建和管理优化任务
+/api/sessions/<id>/roundness - 获取圆度分析结果
+/api/fmu/parameters - 设置FMU参数
+/api/sessions/<id>/export - 导出优化结果
