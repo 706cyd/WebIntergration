@@ -18,8 +18,6 @@ from fmpy.model_description import ModelDescription
 from fmpy.fmi2 import FMU2Slave
 import logging
 from database_manager import get_db_manager
-from analysis.roundness import analyze_session_roundness
-from optimization.task_manager import OptimizationTaskManager, OptimizationTaskConfig
 
 # 配置日志
 logging.basicConfig(level=logging.INFO)
@@ -73,8 +71,6 @@ class CNCMachineSimulator:
         # 数据库管理器
         self.db_manager = get_db_manager()
         self.session_id = None
-        # FMU 参数（在初始化阶段应用）
-        self.parameter_values = {}
     
     def __del__(self):
         """析构函数，清理FMU资源"""
@@ -208,8 +204,6 @@ class CNCMachineSimulator:
             
             # 设置初始输入值
             self._set_fmu_inputs()
-            # 应用用户指定的参数
-            self._apply_fmu_parameters()
             
             self.fmu_instance.exitInitializationMode()
             
@@ -257,86 +251,6 @@ class CNCMachineSimulator:
                     
         except Exception as e:
             logger.error(f"设置FMU输入失败: {str(e)}")
-
-    def _apply_fmu_parameters(self):
-        """在初始化模式中应用FMU参数（Real/Integer/Boolean/String）。"""
-        if not self.fmu_instance or not self.parameter_values:
-            return
-        try:
-            # 建立 name -> valueReference 与 type 的缓存
-            name_to_vr = {}
-            name_to_type = {}
-            for var in getattr(self.model_description, 'modelVariables', []) or []:
-                try:
-                    if getattr(var, 'causality', None) == 'parameter':
-                        name_to_vr[var.name] = var.valueReference
-                        # FMPy中var.type 可能是类型对象，取其类名或字符串
-                        vtype = getattr(var, 'type', None)
-                        vtype_name = getattr(vtype, '__name__', None) or str(vtype)
-                        name_to_type[var.name] = vtype_name
-                except Exception:
-                    continue
-
-            # 分类不同类型参数
-            reals, integers, booleans, strings = [], [], [], []
-            for name, value in self.parameter_values.items():
-                if name not in name_to_vr:
-                    continue
-                vtype = (name_to_type.get(name, '') or '').lower()
-                vr = name_to_vr[name]
-                if 'real' in vtype:
-                    try:
-                        reals.append((vr, float(value)))
-                    except Exception:
-                        continue
-                elif 'int' in vtype:
-                    try:
-                        integers.append((vr, int(value)))
-                    except Exception:
-                        continue
-                elif 'bool' in vtype:
-                    try:
-                        booleans.append((vr, bool(value)))
-                    except Exception:
-                        continue
-                elif 'string' in vtype:
-                    try:
-                        strings.append((vr, str(value)))
-                    except Exception:
-                        continue
-
-            if reals:
-                self.fmu_instance.setReal([vr for vr, _ in reals], [val for _, val in reals])
-            if integers:
-                self.fmu_instance.setInteger([vr for vr, _ in integers], [val for _, val in integers])
-            if booleans:
-                self.fmu_instance.setBoolean([vr for vr, _ in booleans], [val for _, val in booleans])
-            if strings:
-                self.fmu_instance.setString([vr for vr, _ in strings], [val for _, val in strings])
-
-            logger.info(f"已应用FMU参数: {list(self.parameter_values.keys())}")
-        except Exception as e:
-            logger.error(f"应用FMU参数失败: {str(e)}")
-
-    def set_fmu_parameters(self, params: dict, reinitialize: bool = True) -> bool:
-        """设置参数键值对。在初始化阶段生效；如已实例化可选择重新实例化以应用。"""
-        try:
-            self.parameter_values.update(params or {})
-            logger.info(f"接收FMU参数: {self.parameter_values}")
-            if reinitialize and self.fmu_path and self.model_description:
-                was_running = self.is_running
-                if was_running:
-                    self.stop_simulation()
-                # 重新载入实例以应用参数
-                self._cleanup_fmu()
-                created = self._create_fmu_instance()
-                if was_running and created:
-                    self.start_simulation()
-                return created
-            return True
-        except Exception as e:
-            logger.error(f"设置FMU参数失败: {str(e)}")
-            return False
     
     def _get_fmu_outputs(self):
         """获取FMU输出变量"""
@@ -731,9 +645,6 @@ class CNCMachineSimulator:
 # 创建仿真器实例
 cnc_simulator = CNCMachineSimulator()
 
-# 创建优化任务管理器
-optimization_manager = OptimizationTaskManager(cnc_simulator)
-
 @app.route('/')
 def index():
     """主页"""
@@ -890,36 +801,6 @@ def get_session_statistics(session_id):
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/api/sessions/<int:session_id>/roundness', methods=['GET'])
-def get_session_roundness(session_id):
-    """计算并返回指定会话的圆度指标。
-    可选参数：time_range(秒)
-    返回：中心、半径、圆度误差及偏差范围。
-    """
-    try:
-        time_range = request.args.get('time_range', default=None, type=int)
-        metrics = analyze_session_roundness(session_id, time_range)
-        return jsonify({'success': True, 'metrics': metrics})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/fmu/parameters', methods=['POST'])
-def set_fmu_parameters():
-    """设置FMU参数并可选择是否立即重新实例化以生效。
-    请求JSON示例：{"params": {"Kv_x": 1200.0}, "reinitialize": true}
-    返回：success布尔与可选错误。
-    """
-    try:
-        if not request.is_json:
-            return jsonify({'success': False, 'error': 'Content-Type必须为application/json'})
-        payload = request.get_json(silent=True) or {}
-        params = payload.get('params', {}) or {}
-        reinit = bool(payload.get('reinitialize', True))
-        ok = cnc_simulator.set_fmu_parameters(params, reinitialize=reinit)
-        return jsonify({'success': bool(ok)})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-
 @app.route('/api/sessions/<int:session_id>/positions', methods=['GET'])
 def get_session_positions(session_id):
     """获取会话位置历史"""
@@ -977,293 +858,6 @@ def cleanup_database():
         db_manager.cleanup_old_data(retention_days)
         return jsonify({'success': True, 'message': f'清理了{retention_days}天前的数据'})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)})
-
-# ================================
-# 贝叶斯优化API接口
-# ================================
-
-@app.route('/api/optimization/tasks', methods=['POST'])
-def create_optimization_task():
-    """创建优化任务"""
-    try:
-        if not request.is_json:
-            return jsonify({'success': False, 'error': 'Content-Type必须为application/json'})
-        
-        data = request.get_json()
-        
-        # 验证必需字段
-        if 'task_name' not in data:
-            return jsonify({'success': False, 'error': '缺少必需字段: task_name'})
-        
-        # 创建任务配置
-        config = OptimizationTaskConfig(
-            task_name=data['task_name'],
-            objective_type=data.get('objective_type', 'minimize_roundness'),
-            parameter_space_config=data.get('parameter_space'),
-            experiment_config=data.get('experiment_config'),
-            acquisition_function=data.get('acquisition_function', 'expected_improvement'),
-            n_initial_points=data.get('n_initial_points', 5),
-            max_iterations=data.get('max_iterations', 50),
-            convergence_threshold=data.get('convergence_threshold', 1e-6),
-            patience=data.get('patience', 5),
-            random_state=data.get('random_state')
-        )
-        
-        # 创建任务
-        task_id = optimization_manager.create_task(config)
-        
-        return jsonify({
-            'success': True,
-            'task_id': task_id,
-            'message': f'优化任务 {task_id} 创建成功'
-        })
-        
-    except Exception as e:
-        logger.error(f"创建优化任务失败: {e}")
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/optimization/tasks/<int:task_id>/start', methods=['POST'])
-def start_optimization_task(task_id):
-    """启动优化任务"""
-    try:
-        success = optimization_manager.start_task(task_id)
-        
-        if success:
-            return jsonify({
-                'success': True,
-                'message': f'优化任务 {task_id} 启动成功'
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'error': f'无法启动任务 {task_id}，请检查任务状态或并发限制'
-            })
-            
-    except Exception as e:
-        logger.error(f"启动优化任务失败: {e}")
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/optimization/tasks/<int:task_id>/stop', methods=['POST'])
-def stop_optimization_task(task_id):
-    """停止优化任务"""
-    try:
-        success = optimization_manager.stop_task(task_id)
-        
-        if success:
-            return jsonify({
-                'success': True,
-                'message': f'优化任务 {task_id} 停止成功'
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'error': f'任务 {task_id} 不存在或无法停止'
-            })
-            
-    except Exception as e:
-        logger.error(f"停止优化任务失败: {e}")
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/optimization/tasks/<int:task_id>/pause', methods=['POST'])
-def pause_optimization_task(task_id):
-    """暂停优化任务"""
-    try:
-        success = optimization_manager.pause_task(task_id)
-        
-        if success:
-            return jsonify({
-                'success': True,
-                'message': f'优化任务 {task_id} 暂停成功'
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'error': f'任务 {task_id} 不存在或无法暂停'
-            })
-            
-    except Exception as e:
-        logger.error(f"暂停优化任务失败: {e}")
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/optimization/tasks/<int:task_id>/resume', methods=['POST'])
-def resume_optimization_task(task_id):
-    """恢复优化任务"""
-    try:
-        success = optimization_manager.resume_task(task_id)
-        
-        if success:
-            return jsonify({
-                'success': True,
-                'message': f'优化任务 {task_id} 恢复成功'
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'error': f'任务 {task_id} 不存在或无法恢复'
-            })
-            
-    except Exception as e:
-        logger.error(f"恢复优化任务失败: {e}")
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/optimization/tasks/<int:task_id>/status', methods=['GET'])
-def get_optimization_task_status(task_id):
-    """获取优化任务状态"""
-    try:
-        status = optimization_manager.get_task_status(task_id)
-        
-        if status:
-            return jsonify({
-                'success': True,
-                'data': status
-            })
-        else:
-            return jsonify({
-                'success': False,
-                'error': f'任务 {task_id} 不存在'
-            })
-            
-    except Exception as e:
-        logger.error(f"获取任务状态失败: {e}")
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/optimization/tasks', methods=['GET'])
-def get_all_optimization_tasks():
-    """获取所有优化任务状态"""
-    try:
-        tasks = optimization_manager.get_all_tasks_status()
-        
-        return jsonify({
-            'success': True,
-            'data': tasks,
-            'count': len(tasks)
-        })
-        
-    except Exception as e:
-        logger.error(f"获取所有任务状态失败: {e}")
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/optimization/tasks/<int:task_id>/evaluations', methods=['GET'])
-def get_optimization_evaluations(task_id):
-    """获取优化任务的评估历史"""
-    try:
-        db_manager = get_db_manager()
-        
-        # 查询评估历史
-        conn = db_manager.get_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT iteration, parameters, objective_value, session_id,
-                   evaluation_time, simulation_duration, additional_metrics,
-                   is_feasible, error_message
-            FROM optimization_evaluations
-            WHERE task_id = ?
-            ORDER BY iteration ASC
-        """, (task_id,))
-        
-        evaluations = []
-        for row in cursor.fetchall():
-            evaluation = {
-                'iteration': row[0],
-                'parameters': json.loads(row[1]) if row[1] else {},
-                'objective_value': row[2],
-                'session_id': row[3],
-                'evaluation_time': row[4],
-                'simulation_duration': row[5],
-                'additional_metrics': json.loads(row[6]) if row[6] else {},
-                'is_feasible': bool(row[7]),
-                'error_message': row[8]
-            }
-            evaluations.append(evaluation)
-        
-        conn.close()
-        
-        return jsonify({
-            'success': True,
-            'data': evaluations,
-            'count': len(evaluations)
-        })
-        
-    except Exception as e:
-        logger.error(f"获取评估历史失败: {e}")
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/optimization/parameter-configs', methods=['GET'])
-def get_parameter_configs():
-    """获取预定义的参数空间配置"""
-    try:
-        db_manager = get_db_manager()
-        conn = db_manager.get_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            SELECT config_name, description, parameters, created_at
-            FROM parameter_configs
-            ORDER BY created_at DESC
-        """)
-        
-        configs = []
-        for row in cursor.fetchall():
-            config = {
-                'name': row[0],
-                'description': row[1],
-                'parameters': json.loads(row[2]) if row[2] else {},
-                'created_at': row[3]
-            }
-            configs.append(config)
-        
-        conn.close()
-        
-        return jsonify({
-            'success': True,
-            'data': configs,
-            'count': len(configs)
-        })
-        
-    except Exception as e:
-        logger.error(f"获取参数配置失败: {e}")
-        return jsonify({'success': False, 'error': str(e)})
-
-@app.route('/api/optimization/parameter-configs', methods=['POST'])
-def create_parameter_config():
-    """创建新的参数空间配置"""
-    try:
-        if not request.is_json:
-            return jsonify({'success': False, 'error': 'Content-Type必须为application/json'})
-        
-        data = request.get_json()
-        
-        # 验证必需字段
-        required_fields = ['name', 'parameters']
-        for field in required_fields:
-            if field not in data:
-                return jsonify({'success': False, 'error': f'缺少必需字段: {field}'})
-        
-        db_manager = get_db_manager()
-        conn = db_manager.get_connection()
-        cursor = conn.cursor()
-        
-        cursor.execute("""
-            INSERT INTO parameter_configs (config_name, description, parameters)
-            VALUES (?, ?, ?)
-        """, (
-            data['name'],
-            data.get('description', ''),
-            json.dumps(data['parameters'])
-        ))
-        
-        conn.commit()
-        conn.close()
-        
-        return jsonify({
-            'success': True,
-            'message': f'参数配置 "{data["name"]}" 创建成功'
-        })
-        
-    except Exception as e:
-        logger.error(f"创建参数配置失败: {e}")
         return jsonify({'success': False, 'error': str(e)})
 
 if __name__ == '__main__':
