@@ -4,10 +4,6 @@ using UnityEngine;
 using System.Runtime.InteropServices;
 using Newtonsoft.Json;
 
-// Alternative: If you don't want to install Newtonsoft.Json, uncomment the line below and comment out the Newtonsoft.Json line above
-// Note: This will require some code modifications to work with Unity's JsonUtility
-// using System;
-
 /// <summary>
 /// 五轴数控机床Unity控制器
 /// 通过WebSocket接收FMU仿真数据并控制3D模型运动
@@ -23,13 +19,20 @@ public class CNCMachineController : MonoBehaviour
     [SerializeField] private Transform tool;        // 刀具
     
     [Header("运动参数")]
-    [SerializeField] private float positionScale = 0.01f;  // 位置缩放比例
+    [SerializeField] private float positionScale = 1.0f;  // 位置缩放比例 (Unity与模型均按mm)
     [SerializeField] private float smoothTime = 0.1f;      // 平滑时间
     [SerializeField] private bool enableSmoothing = true;  // 启用平滑运动
     
     [Header("调试选项")]
     [SerializeField] private bool debugMode = true;
     [SerializeField] private Canvas debugUI;
+
+    [Header("Debug Movement")]
+    [Tooltip("启用后，可以使用键盘箭头来测试Z轴运动和碰撞。")]
+    [SerializeField] private bool enableDebugMovement = true;
+    [SerializeField] private float debugMoveSpeed = 1.0f;
+    
+    // 碰撞相关字段已移除
     
     // 当前位置和目标位置
     private Vector3 currentPositionX = Vector3.zero;
@@ -74,6 +77,16 @@ public class CNCMachineController : MonoBehaviour
     
     void Update()
     {
+        
+
+        // --- DEBUG MOVEMENT ---
+        if (enableDebugMovement && spindleZ != null)
+        {
+            float verticalInput = Input.GetAxis("Vertical"); // 上下箭头
+            targetPositionZ += new Vector3(0, 0, verticalInput * debugMoveSpeed * Time.deltaTime);
+        }
+        // --- END DEBUG MOVEMENT ---
+        
         UpdateMachineMovement();
         UpdateDebugInfo();
     }
@@ -111,10 +124,8 @@ public class CNCMachineController : MonoBehaviour
         RegisterUnityCallback();
         ConnectToWebSocket();
         #else
-        // 编辑器模式下的模拟连接
-        Debug.Log("编辑器模式：模拟WebSocket连接");
-        isConnected = true;
-        StartCoroutine(SimulateDataInEditor());
+        // 编辑器模式下的模拟连接 - 这部分将被移除
+        Debug.Log("编辑器模式已被禁用");
         #endif
     }
     
@@ -170,6 +181,36 @@ public class CNCMachineController : MonoBehaviour
         if (tableC != null)
             tableC.localEulerAngles = currentRotationC;
     }
+
+    /// <summary>
+    /// 计算某个变换在给定局部轴方向上的父层级缩放（近似）。
+    /// 返回该局部轴在世界空间中的整体尺度系数（只考虑缩放，不考虑旋转导致的轴混合）。
+    /// </summary>
+    private float GetParentAxisScale(Transform t, Vector3 localAxis)
+    {
+        if (t == null) return 1f;
+        Transform p = t.parent;
+        // 若无父级，仅返回1
+        if (p == null) return 1f;
+
+        // 将局部轴逐级映射，同时累乘对应轴向缩放的模长
+        // 简化：取父级缩放在该轴方向的长度近似（忽略非均匀缩放下旋转造成的轴耦合）
+        float scale = 1f;
+        Vector3 axis = localAxis.normalized;
+        while (p != null)
+        {
+            // 在父级局部坐标中，轴向会被父级旋转改变；这里采用近似：按父级的lossyScale在各分量上的投影长度
+            Vector3 s = p.lossyScale;
+            // 近似投影：|axis.x|*sx + |axis.y|*sy + |axis.z|*sz （上界近似）
+            float projected = Mathf.Abs(axis.x) * Mathf.Max(1e-6f, s.x)
+                            + Mathf.Abs(axis.y) * Mathf.Max(1e-6f, s.y)
+                            + Mathf.Abs(axis.z) * Mathf.Max(1e-6f, s.z);
+            scale *= projected;
+
+            p = p.parent;
+        }
+        return scale;
+    }
     
     /// <summary>
     /// 接收来自WebSocket的变换数据
@@ -215,19 +256,43 @@ public class CNCMachineController : MonoBehaviour
         if (transforms.ContainsKey("table_x"))
         {
             var pos = transforms["table_x"].position;
-            targetPositionX = new Vector3(pos.x * positionScale, pos.y * positionScale, pos.z * positionScale);
+            // 补偿父层级缩放，确保X轴与仿真尺度一致
+            float invParentScaleX = 1f / Mathf.Max(1e-6f, GetParentAxisScale(tableX, Vector3.right));
+            float invParentScaleY = 1f / Mathf.Max(1e-6f, GetParentAxisScale(tableX, Vector3.up));
+            float invParentScaleZ = 1f / Mathf.Max(1e-6f, GetParentAxisScale(tableX, Vector3.forward));
+            targetPositionX = new Vector3(
+                pos.x * positionScale * invParentScaleX,
+                pos.y * positionScale * invParentScaleY,
+                pos.z * positionScale * invParentScaleZ
+            );
         }
         
         if (transforms.ContainsKey("table_y"))
         {
             var pos = transforms["table_y"].position;
-            targetPositionY = new Vector3(pos.x * positionScale, pos.y * positionScale, pos.z * positionScale);
+            // 补偿父层级缩放，确保Y轴与仿真尺度一致
+            float invParentScaleX = 1f / Mathf.Max(1e-6f, GetParentAxisScale(tableY, Vector3.right));
+            float invParentScaleY = 1f / Mathf.Max(1e-6f, GetParentAxisScale(tableY, Vector3.up));
+            float invParentScaleZ = 1f / Mathf.Max(1e-6f, GetParentAxisScale(tableY, Vector3.forward));
+            targetPositionY = new Vector3(
+                pos.x * positionScale * invParentScaleX,
+                pos.y * positionScale * invParentScaleY,
+                pos.z * positionScale * invParentScaleZ
+            );
         }
         
         if (transforms.ContainsKey("spindle_z"))
         {
             var pos = transforms["spindle_z"].position;
-            targetPositionZ = new Vector3(pos.x * positionScale, pos.y * positionScale, pos.z * positionScale);
+            // 按父层级缩放进行补偿，使世界位移与仿真尺度一致
+            float invParentScaleX = 1f / Mathf.Max(1e-6f, GetParentAxisScale(spindleZ, Vector3.right));
+            float invParentScaleY = 1f / Mathf.Max(1e-6f, GetParentAxisScale(spindleZ, Vector3.up));
+            float invParentScaleZ = 1f / Mathf.Max(1e-6f, GetParentAxisScale(spindleZ, Vector3.forward));
+            targetPositionZ = new Vector3(
+                pos.x * positionScale * invParentScaleX,
+                pos.z * positionScale * invParentScaleY,
+                pos.y * positionScale * invParentScaleZ
+            );
         }
         
         if (transforms.ContainsKey("head_a"))
@@ -236,10 +301,10 @@ public class CNCMachineController : MonoBehaviour
             targetRotationA = new Vector3(rot.x, rot.y, rot.z);
         }
         
-        if (transforms.ContainsKey("table_c"))
+        if (transforms.ContainsKey("table_c")) 
         {
             var rot = transforms["table_c"].rotation;
-            targetRotationC = new Vector3(rot.x, rot.y, rot.z);
+            targetRotationC = new Vector3(rot.x, rot.z, rot.y);
         }
     }
     
@@ -260,7 +325,7 @@ public class CNCMachineController : MonoBehaviour
         #if UNITY_WEBGL && !UNITY_EDITOR
         SendCommandToServer(jsonCommand);
         #else
-        Debug.Log($"编辑器模式 - 发送指令: {jsonCommand}");
+        Debug.Log($"编辑器模式已被禁用 - 指令未发送: {jsonCommand}");
         #endif
     }
     
@@ -280,9 +345,11 @@ public class CNCMachineController : MonoBehaviour
         #if UNITY_WEBGL && !UNITY_EDITOR
         SendCommandToServer(jsonCommand);
         #else
-        Debug.Log($"编辑器模式 - 设置速度: {jsonCommand}");
+        Debug.Log($"编辑器模式已被禁用 - 速度设置未发送: {jsonCommand}");
         #endif
     }
+    
+    // 碰撞处理相关方法已移除
     
     /// <summary>
     /// 更新调试信息
@@ -294,50 +361,7 @@ public class CNCMachineController : MonoBehaviour
         // 可以在这里更新UI显示当前位置、速度等信息
     }
     
-    /// <summary>
-    /// 编辑器模式下的数据模拟
-    /// </summary>
-    private IEnumerator SimulateDataInEditor()
-    {
-        while (true)
-        {
-            yield return new WaitForSeconds(0.1f);
-            
-            // 模拟仿真数据
-            float t = Time.time;
-            var simulatedData = new UnityTransformData
-            {
-                timestamp = t,
-                transforms = new Dictionary<string, TransformInfo>
-                {
-                    ["table_x"] = new TransformInfo 
-                    { 
-                        position = new Vector3Info { x = 10 * Mathf.Sin(0.1f * t), y = 0, z = 0 }
-                    },
-                    ["table_y"] = new TransformInfo 
-                    { 
-                        position = new Vector3Info { x = 0, y = 0, z = 10 * Mathf.Cos(0.1f * t) }
-                    },
-                    ["spindle_z"] = new TransformInfo 
-                    { 
-                        position = new Vector3Info { x = 0, y = 5 * Mathf.Sin(0.05f * t), z = 0 }
-                    },
-                    ["head_a"] = new TransformInfo 
-                    { 
-                        rotation = new Vector3Info { x = 30 * Mathf.Sin(0.02f * t), y = 0, z = 0 }
-                    },
-                    ["table_c"] = new TransformInfo 
-                    { 
-                        rotation = new Vector3Info { x = 0, y = 45 * Mathf.Cos(0.03f * t), z = 0 }
-                    }
-                },
-                velocities = new Dictionary<string, float>(),
-                machine_state = new MachineState { is_running = true }
-            };
-            
-            UpdateTargetTransforms(simulatedData.transforms);
-        }
-    }
+    // SimulateDataInEditor 方法将被完全删除
     
     /// <summary>
     /// 连接状态改变回调

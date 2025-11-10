@@ -293,28 +293,30 @@ function stopSimulationFromUnity() {
 }
 
 // 初始化Unity集成
-document.addEventListener('DOMContentLoaded', function() {
-    unityIntegration = new UnityIntegration();
-    
-    // 监听窗口大小变化
-    window.addEventListener('resize', () => {
-        if (unityIntegration) {
-            unityIntegration.onWindowResize();
-        }
-    });
+// 保证全局可访问
+unityIntegration = new UnityIntegration();
+window.unityIntegration = unityIntegration;
+
+// 监听窗口大小变化
+window.addEventListener('resize', () => {
+    if (unityIntegration) {
+        unityIntegration.onWindowResize();
+    }
 });
 
 // 键盘快捷键
 document.addEventListener('keydown', function(event) {
-    // 若当前焦点在可编辑元素上，则不要拦截键盘事件
-    const active = document.activeElement;
-    const isEditable = active && (
-        active.tagName === 'INPUT' ||
-        active.tagName === 'TEXTAREA' ||
-        active.tagName === 'SELECT' ||
-        active.isContentEditable
+    // 若事件目标为可编辑元素（更稳健），则不处理键盘事件
+    const t = event.target;
+    const isEditable = t && (
+        t.tagName === 'INPUT' ||
+        t.tagName === 'TEXTAREA' ||
+        t.tagName === 'SELECT' ||
+        t.isContentEditable
     );
     if (isEditable) {
+        //++--- 补充修复，让输入控件内输入不会被全局阻断 ---++
+        // 不要阻止其默认事件、不做任何全局快捷操作
         return;
     }
 

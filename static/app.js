@@ -174,11 +174,11 @@ class CNCSimulatorClient {
     
     updateAxisPositions(data) {
         if (data.positions) {
-            document.getElementById('xPosition').textContent = `${data.positions.X.toFixed(2)} mm`;
-            document.getElementById('yPosition').textContent = `${data.positions.Y.toFixed(2)} mm`;
-            document.getElementById('zPosition').textContent = `${data.positions.Z.toFixed(2)} mm`;
-            document.getElementById('aPosition').textContent = `${data.positions.A.toFixed(2)}°`;
-            document.getElementById('cPosition').textContent = `${data.positions.C.toFixed(2)}°`;
+            document.getElementById('xPosition').textContent = `${data.positions.X.toFixed(4)} mm`;
+            document.getElementById('yPosition').textContent = `${data.positions.Y.toFixed(4)} mm`;
+            document.getElementById('zPosition').textContent = `${data.positions.Z.toFixed(4)} mm`;
+            document.getElementById('aPosition').textContent = `${data.positions.A.toFixed(4)}°`;
+            document.getElementById('cPosition').textContent = `${data.positions.C.toFixed(4)}°`;
         }
         
         if (data.timestamp) {
@@ -263,11 +263,11 @@ class CNCSimulatorClient {
                 const ts = d.timestamp != null ? Number(d.timestamp).toFixed(2) : '-';
                 container.innerHTML = `
                     <div class="row g-2">
-                        <div class="col-6">X: ${Number(p.X||0).toFixed(2)} mm <span class="text-muted">(${Number(v.X||0).toFixed(2)})</span></div>
-                        <div class="col-6">Y: ${Number(p.Y||0).toFixed(2)} mm <span class="text-muted">(${Number(v.Y||0).toFixed(2)})</span></div>
-                        <div class="col-6">Z: ${Number(p.Z||0).toFixed(2)} mm <span class="text-muted">(${Number(v.Z||0).toFixed(2)})</span></div>
-                        <div class="col-6">A: ${Number(p.A||0).toFixed(2)} ° <span class="text-muted">(${Number(v.A||0).toFixed(2)})</span></div>
-                        <div class="col-6">C: ${Number(p.C||0).toFixed(2)} ° <span class="text-muted">(${Number(v.C||0).toFixed(2)})</span></div>
+                        <div class="col-6">X: ${Number(p.X||0).toFixed(4)} mm <span class="text-muted">(${Number(v.X||0).toFixed(4)})</span></div>
+                        <div class="col-6">Y: ${Number(p.Y||0).toFixed(4)} mm <span class="text-muted">(${Number(v.Y||0).toFixed(4)})</span></div>
+                        <div class="col-6">Z: ${Number(p.Z||0).toFixed(4)} mm <span class="text-muted">(${Number(v.Z||0).toFixed(4)})</span></div>
+                        <div class="col-6">A: ${Number(p.A||0).toFixed(4)} ° <span class="text-muted">(${Number(v.A||0).toFixed(4)})</span></div>
+                        <div class="col-6">C: ${Number(p.C||0).toFixed(4)} ° <span class="text-muted">(${Number(v.C||0).toFixed(4)})</span></div>
                         <div class="col-12 text-muted">时间戳: ${ts}</div>
                     </div>`;
             })
@@ -526,5 +526,74 @@ function setUnityAspect(mode) {
         box.classList.add('aspect-square');
     } else {
         box.classList.add('aspect-16-9');
+    }
+}
+
+function switchCamera(idx) {
+    // 专注unityIntegration.unityInstance
+    let inst = window.unityIntegration && window.unityIntegration.unityInstance;
+    if (inst) {
+        inst.SendMessage('CameraSwitcher', 'SwitchToCamera', idx);
+    } else {
+        alert('Unity尚未加载完成，无法切换视角。');
+    }
+}
+
+// Z轴速度滑块监听
+document.addEventListener('DOMContentLoaded', function() {
+    const zAxisSpeedInput = document.getElementById('zAxisSpeedInput');
+    if (zAxisSpeedInput) {
+        zAxisSpeedInput.addEventListener('input', (e) => {
+            const value = parseFloat(e.target.value);
+            document.getElementById('zAxisSpeedValue').textContent = `${value.toFixed(1)}x`;
+            
+            // 实时更新Unity中的速度
+            let inst = window.unityIntegration && window.unityIntegration.unityInstance;
+            if (inst) {
+                inst.SendMessage('z', 'SetSpeedMultiplier', value);
+            }
+        });
+    }
+});
+
+// Z轴S型运动控制函数
+function startZAxisSMotion() {
+    let inst = window.unityIntegration && window.unityIntegration.unityInstance;
+    if (inst) {
+        // 先设置速度
+        const speed = parseFloat(document.getElementById('zAxisSpeedInput').value);
+        inst.SendMessage('z', 'SetSpeedMultiplier', speed);
+        
+        // 再启动运动
+        inst.SendMessage('z', 'StartSMotion', '');
+        if (cncClient) {
+            cncClient.log(`启动Z轴S型运动 (速度: ${speed.toFixed(1)}x)`, 'success');
+        }
+    } else {
+        alert('Unity尚未加载完成，无法启动运动。');
+    }
+}
+
+function stopZAxisSMotion() {
+    let inst = window.unityIntegration && window.unityIntegration.unityInstance;
+    if (inst) {
+        inst.SendMessage('z', 'StopSMotion', '');
+        if (cncClient) {
+            cncClient.log('停止Z轴S型运动', 'warning');
+        }
+    } else {
+        alert('Unity尚未加载完成。');
+    }
+}
+
+function resetZAxisPosition() {
+    let inst = window.unityIntegration && window.unityIntegration.unityInstance;
+    if (inst) {
+        inst.SendMessage('z', 'ResetPosition', '');
+        if (cncClient) {
+            cncClient.log('重置Z轴位置', 'info');
+        }
+    } else {
+        alert('Unity尚未加载完成。');
     }
 }

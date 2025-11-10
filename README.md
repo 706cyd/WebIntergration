@@ -1,168 +1,111 @@
-# 五轴数控机床FMU仿真器
+# CNC 数字孪生
 
-这是一个基于Flask和FMPy的五轴数控机床仿真服务器，支持通过WebSocket进行实时通信。
+## 1. 项目概述
 
-## 功能特性
+本项目旨在构建一个基于 Web 的五轴 CNC 机床数字孪生系统。
 
-- **FMU文件加载**: 支持上传和解析FMU (Functional Mock-up Unit) 文件
-- **变量识别**: 自动识别FMU文件中的输入和输出变量
-- **实时仿真**: 五轴（X、Y、Z、A、C）位置实时更新和显示
-- **WebSocket通信**: 实时双向通信，支持发送控制指令和接收状态数据
-- **Web界面**: 现代化的响应式Web界面，支持：
-  - FMU文件上传和管理
-  - 变量信息查看
-  - 轴位置实时监控
-  - 手动控制面板
-  - 仿真控制
-  - 系统日志显示
 
-## 系统要求
 
-- Python 3.7+
-- 支持FMU 2.0标准的模型文件
+---技术架构
+后端: Flask + Flask-SocketIO
+FMU处理: FMPy库
+前端: Bootstrap 5 + Socket.IO客户端
+通信: WebSocket实时双向通信
 
-## 安装步骤
-
-1. **克隆或下载项目**
-   ```bash
-   git clone <repository-url>
-   cd webserver-cnctwin
-   ```
-
-2. **安装依赖**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-3. **运行服务器**
-   ```bash
-   python app.py
-   ```
-
-4. **访问Web界面**
-   打开浏览器访问: http://localhost:5000
-
-## 使用说明
-
-### 1. 上传FMU文件
-- 在左侧面板点击"选择FMU文件"
-- 选择您的.fmu文件
-- 点击"上传并加载"按钮
-- 系统会自动解析FMU文件并显示变量信息
-
-### 2. 启动仿真
-- 确保FMU文件已成功加载
-- 点击右侧面板的"启动仿真"按钮
-- 观察轴位置的实时变化
-
-### 3. 手动控制
-- 在中间面板选择要控制的轴（X、Y、Z、A、C）
-- 输入目标位置
-- 点击"移动"按钮发送控制指令
-- 使用速度滑块调整仿真速度
-
-### 4. 监控状态
-- 连接状态显示在顶部导航栏
-- 轴位置实时显示在中间面板
-- 系统日志显示在右下角
-
-## API接口
-
-### WebSocket事件
-
-#### 客户端发送事件
-- `start_simulation`: 启动仿真
-- `stop_simulation`: 停止仿真
-- `send_command`: 发送控制指令
-
-#### 服务器发送事件
-- `variable_info`: 变量信息
-- `axis_positions`: 轴位置数据
-- `simulation_status`: 仿真状态
-- `command_response`: 指令响应
-
-### HTTP接口
-- `POST /upload_fmu`: 上传FMU文件
-
-## 控制指令格式
-
-### 轴移动指令
-```json
-{
-  "type": "move_axis",
-  "axis": "X",
-  "position": 10.5
-}
-```
-
-### 速度设置指令
-```json
-{
-  "type": "set_speed",
-  "speed": 2.0
-}
-```
-
-## 项目结构
+## 2. 项目结构
 
 ```
 webserver-cnctwin/
-├── app.py                 # 主服务器文件
-├── requirements.txt       # Python依赖
-├── README.md             # 说明文档
-├── templates/
-│   └── index.html        # Web界面模板
-├── static/
-│   └── app.js           # 前端JavaScript
-└── uploads/             # FMU文件上传目录
+│
+├── Unity_Scripts/              # (重要) Unity 项目的 C# 核心脚本
+│   ├── CNCMachineController.cs # 1. 机床总控制器(大脑): 负责接收坐标、控制运动、处理碰撞报告
+│   └── MachinePartCollider.cs  # 2. 碰撞感知器(神经): 挂载在每个零件上，负责检测物理碰撞并上报
+│
+├── app.py                      # Flask 后端主程序，负责启动 Web 服务和 WebSocket 服务
+├── cnc_simulation.db           # SQLite 数据库文件，存储模拟的 G 代码和机床坐标
+├── database_schema.sql         # 数据库初始化脚本
+├── requirements.txt            # Python 依赖包列表
+├── static/                     # 存放 Unity WebGL 构建出的前端文件
+│   ├── Build/
+│   ├── TemplateData/
+│   └── index.html
+│
+└── templates/
+    └── index.html              # Flask 渲染的 HTML 模板，用于加载 Unity 应用
 ```
 
-## 技术架构
+### 关键脚本说明
 
-- **后端**: Flask + Flask-SocketIO
-- **FMU处理**: FMPy库
-- **前端**: Bootstrap 5 + Socket.IO客户端
-- **通信**: WebSocket实时双向通信
+1.  **`app.py` (后端)**
+    *   使用 Flask-SocketIO 创建 Web 服务器和 WebSocket 服务器。
+    *   从 `cnc_simulation.db` 数据库中读取预存的机床轴坐标数据。
+    *   通过 WebSocket (`/ws`) 以固定的时间间隔，持续向所有连接的前端客户端广播 (broadcast) 坐标数据。
 
-## 注意事项
+2.  **`CNCMachineController.cs` (Unity 前端)**（待修改完善）
+    *    场景总控制器，是整个 Unity 应用的核心。
+    *   **功能**:
+        *   与后端建立 WebSocket 连接。
+        *   接收后端发来的坐标数据，并将其转化为机床各轴（X, Y, Z, A, C）的目标位置和旋转。
+        *   通过 `Update()` 函数平滑地驱动场景中对应的 3D 模型运动到目标位置。
+        *   接收来自 `MachinePartCollider.cs` 的碰撞报告。一旦收到报告，立即停止所有机床运动 (`isHaltedByCollision = true`)，并将碰撞的两个部件高亮为红色。
+        *   内置了键盘测试功能 (`enableDebugMovement`)，允许在不连接后端的情况下，使用键盘上下箭头测试 Z 轴的运动和碰撞逻辑。
 
-1. 确保您的FMU文件符合FMU 2.0标准
-2. 大型FMU文件可能需要较长的加载时间
-3. 仿真精度取决于FMU模型的质量
-4. 建议在局域网环境中使用以获得最佳性能
+---
 
-## 故障排除
+## 3. 环境搭建与启动流程
 
-### 常见问题
+请按照以下步骤操作，以确保项目能成功运行。
 
-1. **FMU文件加载失败**
-   - 检查文件是否为有效的.fmu格式
-   - 确认文件未损坏
-   - 查看系统日志获取详细错误信息
+### 3.1 后端启动
 
-2. **WebSocket连接失败**
-   - 检查防火墙设置
-   - 确认端口5000未被占用
-   - 尝试刷新页面重新连接
+1.  **安装 Python**: 确保本地已安装 Python 3.8 或更高版本。
+2.  **创建虚拟环境 (推荐)**:
+    ```bash
+    python -m venv venv
+    .\venv\Scripts\activate  # Windows
+    # source venv/bin/activate  # macOS/Linux
+    ```
+3.  **安装依赖**:
+    ```bash
+    pip install -r requirements.txt
+    ```
+4.  **初始化数据库**:
+    *   如果项目根目录下没有 `cnc_simulation.db` 文件，请执行以下命令来创建并填充数据：
+    ```bash
+    sqlite3 cnc_simulation.db < database_schema.sql
+    ```
+5.  **启动后端服务**:
+    ```bash
+    python app.py
+    ```
+    启动成功后，您会看到类似 `WebSocket transport listening on http://127.0.0.1:5000` 的输出。
 
-3. **仿真不响应**
-   - 确保已成功加载FMU文件
-   - 检查FMU模型是否支持实时仿真
-   - 查看服务器控制台输出
+### 3.2 Unity 前端配置
 
-## 开发扩展
+1.  **打开 Unity 项目**: 使用 Unity Hub 打开包含 `Unity_Scripts` 文件夹的 Unity 项目。
+2.  **关联模型与脚本**:
+    *   在场景中创建一个空 GameObject 作为总控制器，并将 `CNCMachineController.cs` 挂载上去。
+    *   将场景中代表机床各轴的 3D 模型，分别拖拽到总控制器脚本对应的 `Transform` 字段上（例如 `Table X`, `Spindle Z` 等）。
+    *   为**每一个**需要参与碰撞检测的机床部件（包括工件）添加 `MachinePartCollider.cs` 脚本。
+    *   在**每一个** `MachinePartCollider.cs` 脚本的 `Controller` 字段中，拖入总控制器对象。
+3.  **构建项目**:
+    *   打开 `File -> Build Settings`。
+    *   确保平台选择 `WebGL`。
+    *   点击 `Build`，将项目构建到项目根目录下的 `static` 文件夹中。**请确保输出路径正确，否则后端无法提供前端页面。**
 
-如需扩展功能，可以：
+### 3.3 访问与测试
 
-1. 修改`CNCMachineSimulator`类添加新的仿真逻辑
-2. 在Web界面添加新的控制面板
-3. 扩展WebSocket事件处理
-4. 集成更多的FMU功能
+1.  确保后端服务正在运行。
+2.  打开浏览器，访问 `http://127.0.0.1:5000`。
+3.  您应该能看到 Unity 的加载界面，加载完成后，机床模型会根据后端发送的数据开始运动。
+    ws://192.168.0.112:8080
+---
 
-## 许可证
 
-本项目采用MIT许可证。
 
-## 联系方式
 
-如有问题或建议，请通过GitHub Issues联系。
+1 整合切削。
+2 整合碰撞。
+3 限位（和机床绑定）。
+4 变色功能。左侧层级，点击变色。刀具 夹具 机床不同的颜色。
+5 卧式机床or立式机床（方向对吗？）
