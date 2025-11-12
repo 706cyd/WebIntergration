@@ -7,6 +7,8 @@ class CNCSimulatorClient {
         this.isSimulationRunning = false;
         this.externalWs = null;
         this.externalWsConnected = false;
+        this.travelTestRunning = false;
+        this.travelTestTimer = null;
         this.init();
     }
     
@@ -438,9 +440,9 @@ class CNCSimulatorClient {
 
 // 全局函数
 let cncClient;
-
 document.addEventListener('DOMContentLoaded', function() {
     cncClient = new CNCSimulatorClient();
+    cncClient.init();
 });
 
 function startSimulation() {
@@ -527,6 +529,138 @@ function setUnityAspect(mode) {
     } else {
         box.classList.add('aspect-16-9');
     }
+}
+
+// ===== 行程测试功能 =====
+function startTravelTest() {
+    if (!cncClient) {
+        alert('系统未初始化');
+        return;
+    }
+    
+    const travelConfig = {
+        X: { pos: parseFloat(document.getElementById('travelXPos').value), neg: parseFloat(document.getElementById('travelXNeg').value) },
+        Y: { pos: parseFloat(document.getElementById('travelYPos').value), neg: parseFloat(document.getElementById('travelYNeg').value) },
+        Z: { pos: parseFloat(document.getElementById('travelZPos').value), neg: parseFloat(document.getElementById('travelZNeg').value) },
+        A: { pos: parseFloat(document.getElementById('travelAPos').value), neg: parseFloat(document.getElementById('travelANeg').value) },
+        C: { pos: parseFloat(document.getElementById('travelCPos').value), neg: parseFloat(document.getElementById('travelCNeg').value) }
+    };
+    const delay = parseFloat(document.getElementById('travelDelay').value) * 1000;
+
+    for (const axis in travelConfig) {
+        if (isNaN(travelConfig[axis].pos) || isNaN(travelConfig[axis].neg)) {
+            alert(`${axis}轴的行程值无效，请检查输入`);
+            return;
+        }
+    }
+
+    document.getElementById('startTravelTestBtn').style.display = 'none';
+    document.getElementById('stopTravelTestBtn').style.display = 'block';
+    document.getElementById('travelTestStatus').style.display = 'block';
+    
+    cncClient.travelTestRunning = true;
+    cncClient.log('开始行程测试...', 'info');
+    executeTravelTest(travelConfig, delay);
+}
+
+function stopTravelTest() {
+    if (cncClient) {
+        cncClient.travelTestRunning = false;
+        if (cncClient.travelTestTimer) {
+            clearTimeout(cncClient.travelTestTimer);
+            cncClient.travelTestTimer = null;
+        }
+        resetTravelTestUI();
+        cncClient.log('行程测试已停止', 'warning');
+    }
+}
+
+function resetTravelTestUI() {
+    const startBtn = document.getElementById('startTravelTestBtn');
+    const stopBtn = document.getElementById('stopTravelTestBtn');
+    const statusBox = document.getElementById('travelTestStatus');
+    const bar = document.getElementById('travelProgressBar');
+    const info = document.getElementById('travelTestInfo');
+    if (startBtn) startBtn.style.display = 'block';
+    if (stopBtn) stopBtn.style.display = 'none';
+    if (statusBox) statusBox.style.display = 'none';
+    if (bar) bar.style.width = '0%';
+    if (info) info.textContent = '';
+}
+
+async function executeTravelTest(travelConfig, delay) {
+    const axes = ['X', 'Y', 'Z', 'A', 'C'];
+    const totalSteps = axes.length * 4;
+    let currentStep = 0;
+    
+    for (const axis of axes) {
+        if (!cncClient.travelTestRunning) {
+            cncClient.log('测试被用户中断', 'warning');
+            resetTravelTestUI();
+            return;
+        }
+        const config = travelConfig[axis];
+        currentStep++;
+        updateProgress(currentStep, totalSteps, `${axis}轴 → 正向 ${config.pos}`);
+        await sendMoveCommand(axis, config.pos);
+        await sleep(delay);
+        if (!cncClient.travelTestRunning) { resetTravelTestUI(); return; }
+        currentStep++;
+        updateProgress(currentStep, totalSteps, `${axis}轴 → 原点 0`);
+        await sendMoveCommand(axis, 0);
+        await sleep(delay);
+        if (!cncClient.travelTestRunning) { resetTravelTestUI(); return; }
+        currentStep++;
+        updateProgress(currentStep, totalSteps, `${axis}轴 → 反向 ${config.neg}`);
+        await sendMoveCommand(axis, config.neg);
+        await sleep(delay);
+        if (!cncClient.travelTestRunning) { resetTravelTestUI(); return; }
+        currentStep++;
+        updateProgress(currentStep, totalSteps, `${axis}轴 → 原点 0`);
+        await sendMoveCommand(axis, 0);
+        await sleep(delay);
+    }
+    cncClient.log('行程测试完成！所有轴已测试完毕。', 'success');
+    updateProgress(totalSteps, totalSteps, '测试完成');
+    setTimeout(() => {
+        if (cncClient) {
+            cncClient.travelTestRunning = false;
+            resetTravelTestUI();
+        }
+    }, 2000);
+}
+
+function updateProgress(current, total, message) {
+    const percentage = (current / total) * 100;
+    const bar = document.getElementById('travelProgressBar');
+    const info = document.getElementById('travelTestInfo');
+    if (bar) bar.style.width = `${percentage}%`;
+    if (info) info.textContent = `${message} (${current}/${total})`;
+    if (cncClient) {
+        cncClient.log(`[行程测试] ${message}`, 'info');
+    }
+}
+
+function sendMoveCommand(axis, position) {
+    return new Promise((resolve) => {
+        if (!cncClient || !cncClient.socket) {
+            resolve();
+            return;
+        }
+        const command = { type: 'move_axis', axis: axis, position: position };
+        cncClient.socket.emit('send_command', command);
+        resolve();
+    });
+}
+
+function sleep(ms) {
+    return new Promise(resolve => {
+        if (cncClient) {
+            cncClient.travelTestTimer = setTimeout(resolve, ms);
+        } else {
+            setTimeout(resolve, ms);
+        }
+    });
 }
 
 function switchCamera(idx) {
