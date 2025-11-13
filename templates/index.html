@@ -1427,14 +1427,37 @@
                                     <div class="col-md-6 mb-3 mt-3">
                                         <div class="card h-100">
                                             <div class="card-header">
+                                                <h6 class="mb-0"><i class="fas fa-tools me-2"></i>刀具切换</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="mb-3">
+                                                    <label for="toolSelect" class="form-label">选择刀具</label>
+                                                    <select class="form-select" id="toolSelect" onchange="switchToolWithDebug(this.value)">
+                                                        <option value="1">刀具1</option>
+                                                        <option value="2">刀具2</option>
+                                                    </select>
+                                                </div>
+                                                <div class="d-grid gap-2">
+                                                    <button class="btn btn-info" type="button" onclick="switchToNextTool()">
+                                                        <i class="fas fa-arrow-right me-1"></i>切换到下一把刀具
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="row">
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card h-100">
+                                            <div class="card-header">
                                                 <h6 class="mb-0"><i class="fas fa-wave-square me-2"></i>Z轴S型运动控制</h6>
                                             </div>
                                             <div class="card-body">
                                                 <div class="mb-3">
                                                     <label for="zAxisSpeedInput" class="form-label">运动速度倍率</label>
-                                                    <input type="range" class="form-range" id="zAxisSpeedInput" min="1" max="10" step="0.5" value="1">
+                                                    <input type="range" class="form-range" id="zAxisSpeedInput" min="10" max="50" step="1" value="10">
                                                     <div class="text-center">
-                                                        <span class="badge bg-info" id="zAxisSpeedValue">1.0x</span>
+                                                        <span class="badge bg-info" id="zAxisSpeedValue">10x</span>
                                                     </div>
                                                 </div>
                                                 <div class="d-grid gap-2">
@@ -1447,6 +1470,74 @@
                                                     <button class="btn btn-secondary" type="button" onclick="resetZAxisPosition()">
                                                         <i class="fas fa-undo me-1"></i>重置位置
                                                     </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <!-- WebGL坐标系调试面板 -->
+                                <div class="row">
+                                    <div class="col-md-12 mb-3">
+                                        <div class="card">
+                                            <div class="card-header">
+                                                <h6 class="mb-0"><i class="fas fa-crosshairs me-2"></i>WebGL坐标系调试</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="row">
+                                                    <div class="col-md-4">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">X轴修正值</label>
+                                                            <input type="range" class="form-range" id="correctionX" min="-1" max="1" step="0.01" value="0">
+                                                            <div class="d-flex justify-content-between">
+                                                                <small>-1.0</small>
+                                                                <span id="correctionXValue">0.00</span>
+                                                                <small>1.0</small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Y轴修正值</label>
+                                                            <input type="range" class="form-range" id="correctionY" min="-1" max="1" step="0.01" value="0">
+                                                            <div class="d-flex justify-content-between">
+                                                                <small>-1.0</small>
+                                                                <span id="correctionYValue">0.00</span>
+                                                                <small>1.0</small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <div class="mb-3">
+                                                            <label class="form-label">Z轴修正值</label>
+                                                            <input type="range" class="form-range" id="correctionZ" min="-1" max="1" step="0.01" value="0">
+                                                            <div class="d-flex justify-content-between">
+                                                                <small>-1.0</small>
+                                                                <span id="correctionZValue">0.00</span>
+                                                                <small>1.0</small>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                
+                                                <div class="row">
+                                                    <div class="col-md-12">
+                                                        <div class="d-grid gap-2 d-md-flex">
+                                                            <button type="button" class="btn btn-primary" onclick="applyCoordinateCorrection()">
+                                                                <i class="fas fa-check me-1"></i>应用修正
+                                                            </button>
+                                                            <button type="button" class="btn btn-secondary" onclick="resetCoordinateCorrection()">
+                                                                <i class="fas fa-undo me-1"></i>重置修正
+                                                            </button>
+                                                            <button type="button" class="btn btn-info" onclick="getEnvironmentInfo()">
+                                                                <i class="fas fa-info-circle me-1"></i>获取环境信息
+                                                            </button>
+                                                        </div>
+                                                        
+                                                        <div class="mt-3">
+                                                            <small class="text-muted" id="debugInfo">等待调试信息...</small>
+                                                        </div>
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -1570,7 +1661,15 @@
         }
         
         function showToolManagement() {
-            alert('刀具管理功能');
+            // 显示刀具管理模态框
+            const modal = new bootstrap.Modal(document.getElementById('toolManagementModal'));
+            modal.show();
+            
+            // 初始化刀具模型预览
+            const toolSelect = document.getElementById('toolSelect');
+            if (toolSelect) {
+                updateToolModelPreview(parseInt(toolSelect.value));
+            }
         }
         
         function showFixtureManagement() {
@@ -1748,5 +1847,163 @@ window.addEventListener('keydown', function(event) {
     }
 }, true); // 捕获阶段优先生效
 </script>
+    
+    <style>
+        .tool-preview-card {
+            padding: 20px;
+            text-align: center;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+            border: 1px solid #dee2e6;
+        }
+        
+        .tool-icon {
+            margin-bottom: 15px;
+        }
+        
+        .tool-preview-card h6 {
+            margin-bottom: 10px;
+            color: #495057;
+        }
+        
+        .tool-preview-card p {
+            margin-bottom: 0;
+            line-height: 1.4;
+        }
+        
+        /* 刀具管理模态框深色主题 */
+        #toolManagementModal .modal-content {
+            background-color: #2d2d30;
+            border: 1px solid #3e3e42;
+            color: #cccccc;
+        }
+        
+        #toolManagementModal .modal-header {
+            background-color: #252526;
+            border-bottom: 1px solid #3e3e42;
+        }
+        
+        #toolManagementModal .modal-title {
+            color: #cccccc;
+        }
+        
+        #toolManagementModal .modal-body {
+            background-color: #2d2d30;
+        }
+        
+        #toolManagementModal .modal-footer {
+            background-color: #252526;
+            border-top: 1px solid #3e3e42;
+        }
+        
+        #toolManagementModal .btn-close {
+            filter: invert(1);
+        }
+        
+        #toolManagementModal .form-label {
+            color: #cccccc;
+        }
+        
+        #toolManagementModal .form-select,
+        #toolManagementModal .form-control {
+            background-color: #3c3c3c;
+            border: 1px solid #4a4a4a;
+            color: #cccccc;
+        }
+        
+        #toolManagementModal .form-select:focus,
+        #toolManagementModal .form-control:focus {
+            background-color: #4a4a4a;
+            border-color: #007acc;
+            color: #ffffff;
+            box-shadow: 0 0 0 0.2rem rgba(0, 122, 204, 0.25);
+        }
+        
+        #toolManagementModal .card {
+            background-color: #252526;
+            border: 1px solid #3e3e42;
+        }
+        
+        #toolManagementModal .card-header {
+            background-color: #1e1e1e;
+            border-bottom: 1px solid #3e3e42;
+        }
+        
+        #toolManagementModal .card-title {
+            color: #cccccc;
+        }
+        
+        #toolManagementModal .card-body {
+            background-color: #252526;
+        }
+        
+        #toolManagementModal .text-muted {
+            color: #8a8a8a !important;
+        }
+        
+        #toolManagementModal .btn-primary {
+            background-color: #007acc;
+            border-color: #007acc;
+        }
+        
+        #toolManagementModal .btn-primary:hover {
+            background-color: #005a9e;
+            border-color: #005a9e;
+        }
+        
+        #toolManagementModal .btn-secondary {
+            background-color: #6c757d;
+            border-color: #6c757d;
+        }
+        
+        #toolManagementModal .btn-secondary:hover {
+            background-color: #5a6268;
+            border-color: #545b62;
+        }
+    </style>
+    
+    <!-- 刀具管理模态框 -->
+    <div class="modal fade" id="toolManagementModal" tabindex="-1" aria-labelledby="toolManagementModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="toolManagementModalLabel">刀具管理</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="toolSelect" class="form-label">选择刀具</label>
+                                <select class="form-select" id="toolSelect" onchange="switchToolWithDebug(this.value)">
+                                    <option value="1">刀具1</option>
+                                    <option value="2">刀具2</option>
+                                </select>
+                            </div>
+                            <div class="mb-3">
+                                <button class="btn btn-primary" onclick="switchToNextTool()">切换到下一把刀具</button>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">刀具模型预览</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="toolModelPreview" class="text-center">
+                                        <p class="text-muted">选择刀具后显示对应的Unity模型</p>
+                                        <!-- Unity刀具模型将在这里显示 -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </body>
 </html>

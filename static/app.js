@@ -560,7 +560,11 @@ function startTravelTest() {
     
     cncClient.travelTestRunning = true;
     cncClient.log('开始行程测试...', 'info');
-    executeTravelTest(travelConfig, delay);
+    
+    // 重置所有轴位置到原点，确保从头开始运动
+    resetAllAxesToOrigin().then(() => {
+        executeTravelTest(travelConfig, delay);
+    });
 }
 
 function stopTravelTest() {
@@ -653,6 +657,38 @@ function sendMoveCommand(axis, position) {
     });
 }
 
+function resetAllAxesToOrigin() {
+    return new Promise((resolve) => {
+        if (!cncClient || !cncClient.socket) {
+            resolve();
+            return;
+        }
+        
+        cncClient.log('重置所有轴位置到原点...', 'info');
+        
+        // 重置所有轴到原点位置
+        const axes = ['X', 'Y', 'Z', 'A', 'C'];
+        let resetCount = 0;
+        
+        axes.forEach(axis => {
+            const command = { type: 'move_axis', axis: axis, position: 0 };
+            cncClient.socket.emit('send_command', command, () => {
+                resetCount++;
+                if (resetCount === axes.length) {
+                    // 所有轴重置完成
+                    cncClient.log('所有轴已重置到原点位置', 'success');
+                    resolve();
+                }
+            });
+        });
+        
+        // 如果socket.io回调不支持，使用延迟确保重置完成
+        setTimeout(() => {
+            resolve();
+        }, 100);
+    });
+}
+
 function sleep(ms) {
     return new Promise(resolve => {
         if (cncClient) {
@@ -730,4 +766,210 @@ function resetZAxisPosition() {
     } else {
         alert('Unity尚未加载完成。');
     }
+}
+
+// ===== 刀具切换功能 =====
+function switchTool(toolIndex) {
+    const inst = window.unityIntegration && window.unityIntegration.unityInstance;
+    if (!inst) {
+        console.error('Unity实例未加载完成，无法切换刀具');
+        updateDebugInfo('Unity实例未加载完成，无法切换刀具');
+        return;
+    }
+    
+    // 刀具索引调整：刀具1对应索引0，刀具2对应索引1
+    const unityToolIndex = parseInt(toolIndex) - 1;
+    
+    // 调用Unity中的ToolManager切换刀具
+    inst.SendMessage('ToolManager', 'SwitchToTool', unityToolIndex);
+    
+    // 更新刀具模型预览
+    updateToolModelPreview(parseInt(toolIndex));
+    
+    // 更新刀具选择下拉框的值
+    const toolSelect = document.getElementById('toolSelect');
+    if (toolSelect) {
+        toolSelect.value = toolIndex;
+    }
+    
+    if (cncClient) {
+        cncClient.log(`切换到刀具 ${toolIndex} (Unity索引: ${unityToolIndex})`, 'info');
+    }
+    
+    console.log(`切换到刀具${toolIndex}`);
+    updateDebugInfo(`已切换到刀具${toolIndex}`);
+}
+
+// 更新刀具模型预览
+function updateToolModelPreview(toolIndex) {
+    const previewElement = document.getElementById('toolModelPreview');
+    if (!previewElement) return;
+    
+    // 清除现有内容
+    previewElement.innerHTML = '';
+    
+    // 创建刀具模型预览内容
+    const toolCard = document.createElement('div');
+    toolCard.className = 'tool-preview-card';
+    
+    // 根据刀具索引显示不同的预览内容
+    if (toolIndex === 1) {
+        toolCard.innerHTML = `
+            <div class="tool-icon">
+                <i class="fas fa-wrench fa-3x text-primary"></i>
+            </div>
+            <h6 class="mt-2">刀具1 - 标准铣刀</h6>
+            <p class="text-muted small">直径: 10mm<br>长度: 50mm<br>材质: 硬质合金</p>
+        `;
+    } else if (toolIndex === 2) {
+        toolCard.innerHTML = `
+            <div class="tool-icon">
+                <i class="fas fa-screwdriver fa-3x text-success"></i>
+            </div>
+            <h6 class="mt-2">刀具2 - 球头铣刀</h6>
+            <p class="text-muted small">直径: 8mm<br>长度: 40mm<br>材质: 高速钢</p>
+        `;
+    }
+    
+    previewElement.appendChild(toolCard);
+}
+
+function switchToNextTool() {
+    const toolSelect = document.getElementById('toolSelect');
+    if (!toolSelect) return;
+    
+    const currentIndex = parseInt(toolSelect.value);
+    const maxIndex = parseInt(toolSelect.options[toolSelect.options.length - 1].value);
+    const nextIndex = currentIndex < maxIndex ? currentIndex + 1 : 1;
+    
+    // 使用调试版本的切换函数
+    switchToolWithDebug(nextIndex);
+}
+
+// ===== 坐标系调试功能 =====
+
+// 初始化坐标系调试面板
+document.addEventListener('DOMContentLoaded', function() {
+    // 初始化刀具选择为刀具1
+    const toolSelect = document.getElementById('toolSelect');
+    if (toolSelect) {
+        toolSelect.value = '1';
+    }
+    
+    // 初始化坐标系调试滑块事件
+    initCoordinateDebugSliders();
+    
+    // 页面加载完成后自动切换到刀具1
+    setTimeout(() => {
+        switchTool('1');
+    }, 3000); // 延迟3秒确保Unity已加载完成
+});
+
+// 初始化坐标系调试滑块，添加值显示功能
+function initCoordinateDebugSliders() {
+    const sliders = ['correctionX', 'correctionY', 'correctionZ'];
+    
+    sliders.forEach(sliderId => {
+        const slider = document.getElementById(sliderId);
+        const valueDisplay = document.getElementById(sliderId + 'Value');
+        
+        if (slider && valueDisplay) {
+            // 初始化显示值
+            valueDisplay.textContent = parseFloat(slider.value).toFixed(2);
+            
+            // 添加滑块变化事件
+            slider.addEventListener('input', function() {
+                valueDisplay.textContent = parseFloat(this.value).toFixed(2);
+            });
+        }
+    });
+}
+
+// 应用坐标系修正
+function applyCoordinateCorrection() {
+    const inst = window.unityIntegration && window.unityIntegration.unityInstance;
+    if (!inst) {
+        updateDebugInfo('Unity实例未加载完成，无法调整坐标系修正');
+        return;
+    }
+    
+    const correctionX = parseFloat(document.getElementById('correctionX').value);
+    const correctionY = parseFloat(document.getElementById('correctionY').value);
+    const correctionZ = parseFloat(document.getElementById('correctionZ').value);
+    
+    // 调用Unity中的MillingManager设置坐标系修正
+    inst.SendMessage('MillingManager', 'SetWebGLCoordinateCorrection', 
+        `${correctionX},${correctionY},${correctionZ}`);
+    
+    updateDebugInfo(`已应用坐标系修正: X=${correctionX.toFixed(2)}, Y=${correctionY.toFixed(2)}, Z=${correctionZ.toFixed(2)}`);
+}
+
+// 重置坐标系修正
+function resetCoordinateCorrection() {
+    const inst = window.unityIntegration && window.unityIntegration.unityInstance;
+    if (!inst) {
+        updateDebugInfo('Unity实例未加载完成，无法重置坐标系修正');
+        return;
+    }
+    
+    // 重置滑块为零
+    document.getElementById('correctionX').value = 0;
+    document.getElementById('correctionY').value = 0;
+    document.getElementById('correctionZ').value = 0;
+    
+    // 更新显示值
+    document.getElementById('correctionXValue').textContent = '0.00';
+    document.getElementById('correctionYValue').textContent = '0.00';
+    document.getElementById('correctionZValue').textContent = '0.00';
+    
+    // 调用Unity中的MillingManager重置坐标系修正
+    inst.SendMessage('MillingManager', 'ResetWebGLCoordinateCorrection', '');
+    
+    updateDebugInfo('已重置坐标系修正为零');
+}
+
+// 获取环境信息
+function getEnvironmentInfo() {
+    const inst = window.unityIntegration && window.unityIntegration.unityInstance;
+    if (!inst) {
+        updateDebugInfo('Unity实例未加载完成，无法获取环境信息');
+        return;
+    }
+    
+    // 调用Unity中的MillingManager获取环境信息
+    // 注意：这需要Unity中有相应的方法来返回信息
+    updateDebugInfo('正在获取环境信息...');
+    
+    // 这里可以通过回调方式获取信息，但需要更复杂的实现
+    // 暂时先直接显示基本信息
+    const platform = navigator.platform;
+    const userAgent = navigator.userAgent;
+    const isWebGL = 'WebGLRenderingContext' in window;
+    
+    updateDebugInfo(`平台: ${platform}, WebGL支持: ${isWebGL}, 用户代理: ${userAgent.substring(0, 50)}...`);
+}
+
+// 更新调试信息显示
+function updateDebugInfo(message) {
+    const debugInfo = document.getElementById('debugInfo');
+    if (debugInfo) {
+        debugInfo.textContent = message;
+        debugInfo.className = 'text-info'; // 使用蓝色显示信息
+        
+        // 3秒后恢复为灰色
+        setTimeout(() => {
+            debugInfo.className = 'text-muted';
+        }, 3000);
+    }
+}
+
+// 当切换刀具时，也可以自动重置坐标系修正以便调试
+function switchToolWithDebug(toolIndex) {
+    // 首先重置坐标系修正
+    resetCoordinateCorrection();
+    
+    // 然后切换刀具
+    switchTool(toolIndex);
+    
+    updateDebugInfo(`切换到刀具${toolIndex}，并重置坐标系修正`);
 }
