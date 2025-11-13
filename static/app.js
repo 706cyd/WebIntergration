@@ -829,6 +829,14 @@ function updateToolModelPreview(toolIndex) {
             <h6 class="mt-2">刀具2 - 球头铣刀</h6>
             <p class="text-muted small">直径: 8mm<br>长度: 40mm<br>材质: 高速钢</p>
         `;
+    } else if (toolIndex === 3) {
+        toolCard.innerHTML = `
+            <div class="tool-icon">
+                <i class="fas fa-hammer fa-3x text-warning"></i>
+            </div>
+            <h6 class="mt-2">刀具3 - 钻头</h6>
+            <p class="text-muted small">直径: 6mm<br>长度: 60mm<br>材质: 钴合金</p>
+        `;
     }
     
     previewElement.appendChild(toolCard);
