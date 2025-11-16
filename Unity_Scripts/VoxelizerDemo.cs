@@ -158,12 +158,12 @@ namespace MeshVoxelizerProject
             Box3 localBounds = new Box3(filter.sharedMesh.bounds.min, filter.sharedMesh.bounds.max);
             scale = new Vector3(localBounds.Size.x / size, localBounds.Size.y / size, localBounds.Size.z / size);
             
-            // 调试输出
-            #if UNITY_EDITOR
-            Debug.Log($"[GenerateVoxelMesh] 世界坐标 - wmin: {wmin}, worldSize: {worldSize}, voxelSize_world: {voxelSize_world}");
-            Debug.Log($"[GenerateVoxelMesh] 局部坐标 - m: {m}, scale: {scale}, dstTransform: {dstTransform.name}");
-            Debug.Log($"[GenerateVoxelMesh] 验证: wmin转换回世界坐标 = {dstTransform.TransformPoint(m)} (应该等于wmin)");
-            #endif
+            // 调试输出（已禁用，避免控制台干扰）
+            // #if UNITY_EDITOR
+            // Debug.Log($"[GenerateVoxelMesh] 世界坐标 - wmin: {wmin}, worldSize: {worldSize}, voxelSize_world: {voxelSize_world}");
+            // Debug.Log($"[GenerateVoxelMesh] 局部坐标 - m: {m}, scale: {scale}, dstTransform: {dstTransform.name}");
+            // Debug.Log($"[GenerateVoxelMesh] 验证: wmin转换回世界坐标 = {dstTransform.TransformPoint(m)} (应该等于wmin)");
+            // #endif
 
             // 0902 新增的调试输出信息
             if (outputVoxelDebugInfo)

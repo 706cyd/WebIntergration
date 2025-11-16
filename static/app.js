@@ -1,5 +1,61 @@
 // 五轴数控机床仿真器前端脚本
 
+// 夹具管理相关函数
+function switchFixture(fixtureIndex) {
+    // 添加详细调试日志
+    console.log('switchFixture 调用开始:', { fixtureIndex });
+    console.log('window.unityIntegration 是否存在:', !!window.unityIntegration);
+    if (window.unityIntegration) {
+        console.log('window.unityIntegration.unityInstance 是否存在:', !!window.unityIntegration.unityInstance);
+    }
+    
+    // 通过window.unityIntegration访问Unity实例
+    const unityInstance = window.unityIntegration?.unityInstance;
+    if (unityInstance) {
+        console.log('准备发送消息到Unity: FixtureManager.WebGL_SwitchToFixture');
+        unityInstance.SendMessage('FixtureManager', 'WebGL_SwitchToFixture', fixtureIndex);
+        console.log(`切换到夹具 ${fixtureIndex}`);
+    } else {
+        console.warn('Unity实例未加载');
+    }
+}
+
+function setFixturePosition() {
+    const x = document.getElementById('fixtureX').value;
+    const y = document.getElementById('fixtureY').value;
+    const z = document.getElementById('fixtureZ').value;
+    
+    // 添加详细调试日志
+    console.log('setFixturePosition 调用开始:', { x, y, z });
+    
+    if (!x || !y || !z) {
+        console.warn('坐标输入不完整');
+        alert('请输入完整的X、Y、Z坐标');
+        return;
+    }
+    
+    console.log('window.unityIntegration 是否存在:', !!window.unityIntegration);
+    if (window.unityIntegration) {
+        console.log('window.unityIntegration.unityInstance 是否存在:', !!window.unityIntegration.unityInstance);
+        console.log('window.unityIntegration.isUnityLoaded:', window.unityIntegration.isUnityLoaded);
+    }
+    
+    // 通过window.unityIntegration访问Unity实例
+    const unityInstance = window.unityIntegration?.unityInstance;
+    if (unityInstance) {
+        console.log('Unity实例存在，准备发送坐标数据');
+        // 将坐标合并为一个字符串参数，格式为 "x,y,z"
+        const positionString = `${x},${y},${z}`;
+        console.log('准备发送消息到Unity: FixtureManager.WebGL_SetFixturePosition', { positionString });
+        unityInstance.SendMessage('FixtureManager', 'WebGL_SetFixturePosition', positionString);
+        console.log(`设置夹具位置: X=${x}, Y=${y}, Z=${z}`);
+    } else {
+        console.warn('Unity实例未加载');
+    }
+}
+
+// 工件管理相关函数（旧版本已删除，统一实现在下方）
+
 class CNCSimulatorClient {
     constructor() {
         this.socket = null;
@@ -989,4 +1045,287 @@ function switchToolWithDebug(toolIndex) {
     switchTool(toolIndex);
     
     updateDebugInfo(`切换到刀具${toolIndex}，并重置坐标系修正`);
+}
+
+// ===== 夹具切换功能 =====
+function switchFixture(fixtureIndex) {
+    const inst = window.unityIntegration && window.unityIntegration.unityInstance;
+    if (!inst) {
+        console.error('Unity实例未加载完成，无法切换夹具');
+        updateDebugInfo('Unity实例未加载完成，无法切换夹具');
+        return;
+    }
+    
+    // 夹具索引调整：夹具1对应索引0，夹具2对应索引1
+    const unityFixtureIndex = parseInt(fixtureIndex) - 1;
+    
+    // 调用Unity中的FixtureManager切换夹具（使用WebGL方法，传递减1后的索引作为字符串）
+    inst.SendMessage('FixtureManager', 'WebGL_SwitchToFixture', unityFixtureIndex.toString());
+    
+    // 更新夹具选择下拉框的值
+    const fixtureSelect = document.getElementById('fixtureSelect');
+    if (fixtureSelect) {
+        fixtureSelect.value = fixtureIndex;
+    }
+    
+    if (cncClient) {
+        cncClient.log(`切换到夹具 ${fixtureIndex} (Unity索引: ${unityFixtureIndex})`, 'info');
+    }
+    
+    console.log(`切换到夹具${fixtureIndex}`);
+    updateDebugInfo(`已切换到夹具${fixtureIndex}`);
+}
+
+function setFixturePosition() {
+    // 检查Unity集成是否可用
+    if (!window.unityIntegration) {
+        console.error('window.unityIntegration未初始化');
+        updateDebugInfo('错误：Unity集成模块未初始化');
+        return;
+    }
+    
+    // 检查Unity实例是否可用
+    const inst = window.unityIntegration.unityInstance;
+    if (!inst) {
+        console.error('Unity实例未加载完成，无法设置夹具位置');
+        updateDebugInfo('错误：Unity实例未加载完成');
+        return;
+    }
+    
+    // 查找所有可能的输入框（支持两套ID：fixtureX/Y/Z 和 fixturePosX/Y/Z）
+    const fixtureXInput1 = document.getElementById('fixtureX');
+    const fixtureYInput1 = document.getElementById('fixtureY');
+    const fixtureZInput1 = document.getElementById('fixtureZ');
+    
+    const fixtureXInput2 = document.getElementById('fixturePosX');
+    const fixtureYInput2 = document.getElementById('fixturePosY');
+    const fixtureZInput2 = document.getElementById('fixturePosZ');
+    
+    // 如果所有输入框都不存在，报错
+    if (!fixtureXInput1 && !fixtureXInput2 && !fixtureYInput1 && !fixtureYInput2 && !fixtureZInput1 && !fixtureZInput2) {
+        console.error('未找到任何夹具位置输入元素');
+        updateDebugInfo('错误：未找到输入元素');
+        return;
+    }
+    
+    // 辅助函数：从输入框获取值，优先使用有值的输入框
+    function getInputValue(input1, input2, axisName) {
+        let value = '';
+        let source = '';
+        
+        // 优先检查第二套输入框（fixturePosX/Y/Z）
+        if (input2) {
+            const val2 = String(input2.value || '').trim();
+            console.log(`${axisName} - fixturePos${axisName} 的值:`, val2, '类型:', typeof val2, '原始value:', input2.value);
+            if (val2 !== '' && val2 !== null && val2 !== undefined) {
+                value = val2;
+                source = `fixturePos${axisName}`;
+            }
+        }
+        
+        // 如果第二套为空或不存在，检查第一套
+        if (value === '' && input1) {
+            const val1 = String(input1.value || '').trim();
+            console.log(`${axisName} - fixture${axisName} 的值:`, val1, '类型:', typeof val1, '原始value:', input1.value);
+            if (val1 !== '' && val1 !== null && val1 !== undefined) {
+                value = val1;
+                source = `fixture${axisName}`;
+            }
+        }
+        
+        // 如果都为空，使用第二套的默认值（如果有）
+        if (value === '' && input2) {
+            value = String(input2.value || '').trim();
+            source = `fixturePos${axisName} (默认)`;
+        } else if (value === '' && input1) {
+            value = String(input1.value || '').trim();
+            source = `fixture${axisName} (默认)`;
+        }
+        
+        console.log(`${axisName} 最终选择:`, value, '来源:', source);
+        return value;
+    }
+    
+    // 获取坐标值
+    const xValue = getInputValue(fixtureXInput1, fixtureXInput2, 'X');
+    const yValue = getInputValue(fixtureYInput1, fixtureYInput2, 'Y');
+    const zValue = getInputValue(fixtureZInput1, fixtureZInput2, 'Z');
+    
+    console.log('处理后的原始值 - X:', xValue, 'Y:', yValue, 'Z:', zValue);
+    
+    // 转换为数字（空字符串将转换为0）
+    const posX = xValue === '' ? 0 : parseFloat(xValue);
+    const posY = yValue === '' ? 0 : parseFloat(yValue);
+    const posZ = zValue === '' ? 0 : parseFloat(zValue);
+    
+    // 验证输入值是否为有效数字
+    if (isNaN(posX) || isNaN(posY) || isNaN(posZ)) {
+        console.error('无效的坐标值 - X:', xValue, 'Y:', yValue, 'Z:', zValue);
+        updateDebugInfo('错误：请输入有效的数字坐标值');
+        return;
+    }
+    
+    console.log('最终使用的坐标值 - X:', posX, 'Y:', posY, 'Z:', posZ);
+    
+    // 构建坐标字符串
+    const positionStr = `${posX},${posY},${posZ}`;
+    
+    try {
+        // 调用Unity中的FixtureManager设置夹具位置
+        inst.SendMessage('FixtureManager', 'WebGL_SetFixturePosition', positionStr);
+        
+        if (cncClient) {
+            cncClient.log(`设置夹具位置: X=${posX}, Y=${posY}, Z=${posZ}`, 'info');
+        }
+        
+        console.log(`设置夹具位置成功: X=${posX}, Y=${posY}, Z=${posZ}`);
+        updateDebugInfo(`已设置夹具位置: X=${posX}, Y=${posY}, Z=${posZ}`);
+    } catch (error) {
+        console.error('设置夹具位置时出错:', error);
+        updateDebugInfo('错误：设置位置失败 - ' + error.message);
+    }
+}
+
+// ===== 工件切换功能 =====
+function switchWorkpiece(workpieceIndex) {
+    const inst = window.unityIntegration && window.unityIntegration.unityInstance;
+    if (!inst) {
+        console.error('Unity实例未加载完成，无法切换工件');
+        updateDebugInfo('Unity实例未加载完成，无法切换工件');
+        return;
+    }
+    
+    // 工件索引调整：工件1对应索引0，工件2对应索引1
+    const unityWorkpieceIndex = parseInt(workpieceIndex) - 1;
+    
+    // 调用Unity中的WorkpieceManager切换工件（使用WebGL方法，传递减1后的索引作为字符串）
+    inst.SendMessage('WorkpieceManager', 'WebGL_SwitchToWorkpiece', unityWorkpieceIndex.toString());
+    
+    // 更新工件选择下拉框的值
+    const workpieceSelect = document.getElementById('workpieceSelect');
+    if (workpieceSelect) {
+        workpieceSelect.value = workpieceIndex;
+    }
+    
+    if (cncClient) {
+        cncClient.log(`切换到工件 ${workpieceIndex} (Unity索引: ${unityWorkpieceIndex})`, 'info');
+    }
+    
+    console.log(`切换到工件${workpieceIndex}`);
+    updateDebugInfo(`已切换到工件${workpieceIndex}`);
+}
+
+function setWorkpiecePosition() {
+    // 检查Unity集成是否可用
+    if (!window.unityIntegration) {
+        console.error('window.unityIntegration未初始化');
+        updateDebugInfo('错误：Unity集成模块未初始化');
+        return;
+    }
+    
+    // 检查Unity实例是否可用
+    const inst = window.unityIntegration.unityInstance;
+    if (!inst) {
+        console.error('Unity实例未加载完成，无法移动工件');
+        updateDebugInfo('错误：Unity实例未加载完成');
+        return;
+    }
+    
+    // 查找所有可能的输入框（支持两套ID：workpieceX/Y/Z 和 workpiecePosX/Y/Z）
+    const workpieceXInput1 = document.getElementById('workpieceX');
+    const workpieceYInput1 = document.getElementById('workpieceY');
+    const workpieceZInput1 = document.getElementById('workpieceZ');
+    
+    const workpieceXInput2 = document.getElementById('workpiecePosX');
+    const workpieceYInput2 = document.getElementById('workpiecePosY');
+    const workpieceZInput2 = document.getElementById('workpiecePosZ');
+    
+    // 如果所有输入框都不存在，报错
+    if (!workpieceXInput1 && !workpieceXInput2 && !workpieceYInput1 && !workpieceYInput2 && !workpieceZInput1 && !workpieceZInput2) {
+        console.error('未找到任何工件位置输入元素');
+        updateDebugInfo('错误：未找到输入元素');
+        return;
+    }
+    
+    // 辅助函数：从输入框获取值，优先使用有值的输入框
+    function getInputValue(input1, input2, axisName) {
+        let value = '';
+        let source = '';
+        
+        // 优先检查第二套输入框（workpiecePosX/Y/Z）
+        if (input2) {
+            const val2 = String(input2.value || '').trim();
+            if (val2 !== '' && val2 !== null && val2 !== undefined) {
+                value = val2;
+                source = `workpiecePos${axisName}`;
+            }
+        }
+        
+        // 如果第二套为空或不存在，检查第一套
+        if (value === '' && input1) {
+            const val1 = String(input1.value || '').trim();
+            if (val1 !== '' && val1 !== null && val1 !== undefined) {
+                value = val1;
+                source = `workpiece${axisName}`;
+            }
+        }
+        
+        // 如果都为空，使用0（不移动）
+        if (value === '') {
+            value = '0';
+            source = '默认（不移动）';
+        }
+        
+        return value;
+    }
+    
+    // 获取移动距离值
+    const xValue = getInputValue(workpieceXInput1, workpieceXInput2, 'X');
+    const yValue = getInputValue(workpieceYInput1, workpieceYInput2, 'Y');
+    const zValue = getInputValue(workpieceZInput1, workpieceZInput2, 'Z');
+    
+    // 转换为数字（空字符串将转换为0，表示不移动）
+    const offsetX = xValue === '' ? 0 : parseFloat(xValue);
+    const offsetY = yValue === '' ? 0 : parseFloat(yValue);
+    const offsetZ = zValue === '' ? 0 : parseFloat(zValue);
+    
+    // 验证输入值是否为有效数字
+    if (isNaN(offsetX) || isNaN(offsetY) || isNaN(offsetZ)) {
+        console.error('无效的移动距离值 - X:', xValue, 'Y:', yValue, 'Z:', zValue);
+        updateDebugInfo('错误：请输入有效的数字移动距离');
+        return;
+    }
+    
+    // 如果所有偏移量都为0，提示用户
+    if (offsetX === 0 && offsetY === 0 && offsetZ === 0) {
+        updateDebugInfo('提示：所有移动距离为0，工件位置不变');
+        return;
+    }
+    
+    console.log('移动距离 - X:', offsetX, 'Y:', offsetY, 'Z:', offsetZ);
+    
+    // 构建偏移量字符串
+    const offsetStr = `${offsetX},${offsetY},${offsetZ}`;
+    
+    try {
+        console.log('准备发送消息到Unity:');
+        console.log('  GameObject名称: WorkpieceManager');
+        console.log('  方法名称: WebGL_MoveWorkpiece');
+        console.log('  参数（偏移量）:', offsetStr);
+        
+        // 调用Unity中的WorkpieceManager移动工件（相对移动）
+        inst.SendMessage('WorkpieceManager', 'WebGL_MoveWorkpiece', offsetStr);
+        
+        console.log('消息已发送到Unity');
+        
+        if (cncClient) {
+            cncClient.log(`移动工件: X偏移=${offsetX}, Y偏移=${offsetY}, Z偏移=${offsetZ}`, 'info');
+        }
+        
+        console.log(`移动工件成功: X偏移=${offsetX}, Y偏移=${offsetY}, Z偏移=${offsetZ}`);
+        updateDebugInfo(`已移动工件: X偏移=${offsetX}, Y偏移=${offsetY}, Z偏移=${offsetZ}`);
+    } catch (error) {
+        console.error('移动工件时出错:', error);
+        updateDebugInfo('错误：移动工件失败 - ' + error.message);
+    }
 }

@@ -1447,6 +1447,84 @@
                                         </div>
                                     </div>
                                 </div>
+                                
+                                <!-- 夹具切换功能 -->
+                                <div class="row mt-3">
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card h-100">
+                                            <div class="card-header">
+                                                <h6 class="mb-0"><i class="fas fa-grip me-2"></i>夹具切换</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="mb-3">
+                                                    <label for="fixtureSelect" class="form-label">选择夹具</label>
+                                                    <select class="form-select" id="fixtureSelect" onchange="switchFixture(this.value)">
+                                                        <option value="1">夹具1</option>
+                                                        <option value="2">夹具2</option>
+                                                        <option value="3">夹具3</option>
+                                                    </select>
+                                                </div>
+                                                <div class="row mb-3">
+                                                    <div class="col-md-4">
+                                                        <label for="fixturePosX" class="form-label">X坐标</label>
+                                                        <input type="number" class="form-control" id="fixturePosX" step="0.1" value="0">
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <label for="fixturePosY" class="form-label">Y坐标</label>
+                                                        <input type="number" class="form-control" id="fixturePosY" step="0.1" value="0">
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <label for="fixturePosZ" class="form-label">Z坐标</label>
+                                                        <input type="number" class="form-control" id="fixturePosZ" step="0.1" value="0">
+                                                    </div>
+                                                </div>
+                                                <div class="d-grid gap-2">
+                                                    <button class="btn btn-primary" type="button" onclick="setFixturePosition()">
+                                                        <i class="fas fa-arrows-alt me-1"></i>设置夹具位置
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <!-- 工件切换功能 -->
+                                    <div class="col-md-6 mb-3">
+                                        <div class="card h-100">
+                                            <div class="card-header">
+                                                <h6 class="mb-0"><i class="fas fa-cube me-2"></i>工件切换</h6>
+                                            </div>
+                                            <div class="card-body">
+                                                <div class="mb-3">
+                                                    <label for="workpieceSelect" class="form-label">选择工件</label>
+                                                    <select class="form-select" id="workpieceSelect" onchange="switchWorkpiece(this.value)">
+                                                        <option value="1">工件1</option>
+                                                        <option value="2">工件2</option>
+                                                        <option value="3">工件3</option>
+                                                    </select>
+                                                </div>
+                                                <div class="row mb-3">
+                                                    <div class="col-md-4">
+                                                        <label for="workpiecePosX" class="form-label">X坐标</label>
+                                                        <input type="number" class="form-control" id="workpiecePosX" step="0.1" value="0">
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <label for="workpiecePosY" class="form-label">Y坐标</label>
+                                                        <input type="number" class="form-control" id="workpiecePosY" step="0.1" value="0">
+                                                    </div>
+                                                    <div class="col-md-4">
+                                                        <label for="workpiecePosZ" class="form-label">Z坐标</label>
+                                                        <input type="number" class="form-control" id="workpiecePosZ" step="0.1" value="0">
+                                                    </div>
+                                                </div>
+                                                <div class="d-grid gap-2">
+                                                    <button class="btn btn-success" type="button" onclick="setWorkpiecePosition()">
+                                                        <i class="fas fa-arrows-alt me-1"></i>设置工件位置
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
                                 <div class="row">
                                     <div class="col-md-6 mb-3">
                                         <div class="card h-100">
@@ -1995,6 +2073,146 @@ window.addEventListener('keydown', function(event) {
                                     <div id="toolModelPreview" class="text-center">
                                         <p class="text-muted">选择刀具后显示对应的Unity模型</p>
                                         <!-- Unity刀具模型将在这里显示 -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 夹具管理模态框 -->
+    <div class="modal fade" id="fixtureManagementModal" tabindex="-1" aria-labelledby="fixtureManagementModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="fixtureManagementModalLabel">夹具管理</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="fixtureSelect" class="form-label">选择夹具</label>
+                                <select class="form-select" id="fixtureSelect" onchange="switchFixture(this.value)">
+                                    <option value="1">夹具1</option>
+                                    <option value="2">夹具2</option>
+                                    <option value="3">夹具3</option>
+                                </select>
+                            </div>
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">夹具位置调整</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="fixtureX" class="form-label">X坐标</label>
+                                                <input type="number" class="form-control" id="fixtureX" placeholder="输入X坐标">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="fixtureY" class="form-label">Y坐标</label>
+                                                <input type="number" class="form-control" id="fixtureY" placeholder="输入Y坐标">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="fixtureZ" class="form-label">Z坐标</label>
+                                                <input type="number" class="form-control" id="fixtureZ" placeholder="输入Z坐标">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-primary w-100" onclick="setFixturePosition()">设置位置</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">夹具模型预览</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="fixtureModelPreview" class="text-center">
+                                        <p class="text-muted">选择夹具后显示对应的Unity模型</p>
+                                        <!-- Unity夹具模型将在这里显示 -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 工件管理模态框 -->
+    <div class="modal fade" id="workpieceManagementModal" tabindex="-1" aria-labelledby="workpieceManagementModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="workpieceManagementModalLabel">工件管理</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="workpieceSelect" class="form-label">选择工件</label>
+                                <select class="form-select" id="workpieceSelect" onchange="switchWorkpiece(this.value)">
+                                    <option value="1">工件1</option>
+                                    <option value="2">工件2</option>
+                                    <option value="3">工件3</option>
+                                </select>
+                            </div>
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">工件位置调整</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="row">
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="workpieceX" class="form-label">X坐标</label>
+                                                <input type="number" class="form-control" id="workpieceX" placeholder="输入X坐标">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="workpieceY" class="form-label">Y坐标</label>
+                                                <input type="number" class="form-control" id="workpieceY" placeholder="输入Y坐标">
+                                            </div>
+                                        </div>
+                                        <div class="col-md-4">
+                                            <div class="mb-3">
+                                                <label for="workpieceZ" class="form-label">Z坐标</label>
+                                                <input type="number" class="form-control" id="workpieceZ" placeholder="输入Z坐标">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <button class="btn btn-primary w-100" onclick="setWorkpiecePosition()">设置位置</button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">
+                                    <h6 class="card-title mb-0">工件模型预览</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div id="workpieceModelPreview" class="text-center">
+                                        <p class="text-muted">选择工件后显示对应的Unity模型</p>
+                                        <!-- Unity工件模型将在这里显示 -->
                                     </div>
                                 </div>
                             </div>

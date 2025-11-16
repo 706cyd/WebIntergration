@@ -102,6 +102,8 @@ class UnityIntegration {
             
             this.isUnityLoaded = true;
             console.log('Unity WebGL加载完成');
+            // 确保unityInstance可以被外部访问
+            console.log('Unity实例已初始化，可通过window.unityIntegration.unityInstance访问');
             
             // 设置Unity与WebSocket的通信桥梁
             this.setupUnityWebSocketBridge();
