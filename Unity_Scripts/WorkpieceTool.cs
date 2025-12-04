@@ -23,17 +23,84 @@ public class WorkpieceTool : MonoBehaviour
         gameObject.SetActive(false);
     }
     
+    // 在FixedUpdate之后检查位置（物理系统在FixedUpdate中更新）
+    private void FixedUpdate()
+    {
+        CheckAndRestorePosition();
+    }
+    
     // 在LateUpdate中检查并保持位置（防止被其他脚本重置）
     private void LateUpdate()
+    {
+        CheckAndRestorePosition();
+    }
+    
+    // 检查并恢复位置的统一方法
+    private void CheckAndRestorePosition()
     {
         // 如果位置被锁定，确保位置不被其他脚本改变
         if (isPositionLocked && transform != null)
         {
             // 检查位置是否被改变
-            if (Vector3.Distance(transform.position, lockedPosition) > 0.001f)
+            Vector3 currentPos = transform.position;
+            float distance = Vector3.Distance(currentPos, lockedPosition);
+            
+            if (distance > 0.001f)
             {
-                Debug.LogWarning($"WorkpieceTool [{workpieceName}]: 检测到位置被其他脚本重置！从 {transform.position} 恢复到 {lockedPosition}");
+                Debug.LogWarning($"WorkpieceTool [{workpieceName}]: ===== 检测到位置被其他脚本重置！ =====");
+                Debug.LogWarning($"  当前帧: {Time.frameCount}");
+                Debug.LogWarning($"  当前时间: {Time.time}");
+                Debug.LogWarning($"  当前位置: {currentPos}");
+                Debug.LogWarning($"  锁定位置: {lockedPosition}");
+                Debug.LogWarning($"  位置差异: {distance}");
+                
+                // 检查是否有动画组件
+                Animator animator = GetComponent<Animator>();
+                if (animator != null)
+                {
+                    Debug.LogWarning($"  检测到Animator组件！可能正在控制位置。");
+                }
+                
+                // 检查是否有物理组件
+                Rigidbody rb = GetComponent<Rigidbody>();
+                if (rb != null)
+                {
+                    Debug.LogWarning($"  检测到Rigidbody组件！位置: {rb.position}, 是否运动学: {rb.isKinematic}");
+                }
+                
+                // 检查父对象是否有变化
+                if (transform.parent != null)
+                {
+                    Debug.LogWarning($"  父对象: {transform.parent.name}");
+                    Debug.LogWarning($"  父对象位置: {transform.parent.position}");
+                    Debug.LogWarning($"  父对象本地位置: {transform.parent.localPosition}");
+                    
+                    // 检查父对象上的所有组件
+                    Component[] parentComponents = transform.parent.GetComponents<Component>();
+                    Debug.LogWarning($"  父对象组件数量: {parentComponents.Length}");
+                    foreach (Component comp in parentComponents)
+                    {
+                        if (comp != null)
+                        {
+                            Debug.LogWarning($"    组件: {comp.GetType().Name}");
+                        }
+                    }
+                }
+                
+                // 检查当前对象上的所有组件
+                Component[] components = GetComponents<Component>();
+                Debug.LogWarning($"  当前对象组件数量: {components.Length}");
+                foreach (Component comp in components)
+                {
+                    if (comp != null && comp != this)
+                    {
+                        Debug.LogWarning($"    组件: {comp.GetType().Name}");
+                    }
+                }
+                
+                // 恢复位置
                 transform.position = lockedPosition;
+                Debug.LogWarning($"  已恢复到锁定位置: {lockedPosition}");
             }
         }
     }

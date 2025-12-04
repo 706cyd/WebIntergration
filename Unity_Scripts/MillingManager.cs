@@ -5,228 +5,182 @@ public class MillingManager : MonoBehaviour
 {
     [Header("Control")]
     public bool isOn = false;
-    public Transform cutter;              // 刀具，以 position 为圆柱中心，up 为刀具主方向（旋转轴）
+    public Transform cutter;              // ���ߣ��� position ΪԲ�����ģ�up Ϊ����֧��������ת��
     [Header("Cutter")]
-    public float cutterRadius = 0.5f;     // 圆柱半径 R
-    public float cutterHeight = 1.0f;     // 圆柱总高度 -> 实际 H = height/2
-    public bool drawDebugGizmos = false;  // 可视化一下调试AABB框选项
+    public float cutterRadius = 0.5f;     // Բ���뾶 R
+    public float cutterHeight = 1.0f;     // Բ���ܸ߶� -> ��� H = height/2
+    public bool drawDebugGizmos = false;  // ���ӻ�һ�´���AABB����ѡ��
 
     [Header("Voxel System")]
-    public VoxelizerDemo voxelizerDemo;   // 体素化器的演示脚本
+    public VoxelizerDemo voxelizerDemo;   // ���ػ����ƽű�
 
     [Header("Optimization")]
     public float meshUpdateInterval = 0.1f;
 
-    [Header("Precision Settings")]
-    public bool enablePrecisionMode = true; // WebGL精度模式
-    public float coordinateTolerance = 0.001f; // 坐标容差
-
-    // 常量
-    private const int LINE_AABB_ITERATIONS = 3;
-    private const float DISTANCE_EPSILON = 1e-10f;
-
-    // 状态变量
+    // ����
     private Vector3 worldMin;
     private Vector3 worldSize;
     private Vector3 voxelSize;
     private int size;
     private float updateTimer;
-    private bool isInitialized = false;
-
-    // 调试统计
-    private int totalVoxelTests = 0;
-    private int successfulCuts = 0;
-    private int conversionErrors = 0;
 
     private void Start()
     {
-        InitializeVoxelSystem();
-    }
-
-    /// <summary>
-    /// 初始化体素系统
-    /// </summary>
-    private void InitializeVoxelSystem()
-    {
-        if (voxelizerDemo == null || voxelizerDemo.m_voxelizer == null)
-        {
-            Debug.LogError("VoxelizerDemo 或 m_voxelizer 未分配！");
-            return;
-        }
+        if (voxelizerDemo == null || voxelizerDemo.m_voxelizer == null) return;
 
         size = voxelizerDemo.size;
 
-        // 获取工件网格的世界空间AABB
+        // ���� ����ԭʼ�����ڡ��������ꡱ�µ� AABB�����ף��任8���ǵ�����min/max��
         MeshFilter filter = voxelizerDemo.GetComponentInChildren<MeshFilter>();
-        if (filter == null)
-        {
-            Debug.LogError("未找到MeshFilter组件！");
-            return;
-        }
+        if (filter == null) return;
 
-        CalculateWorkpieceBounds(filter);
-        isInitialized = true;
-
-        Debug.Log($"体素系统初始化完成: 尺寸={size}, 世界范围=[{worldMin} ~ {worldMin + worldSize}]");
-    }
-
-    /// <summary>
-    /// 计算工件的世界空间边界
-    /// </summary>
-    private void CalculateWorkpieceBounds(MeshFilter filter)
-    {
-        var localBounds = filter.sharedMesh.bounds;
+        var lb = filter.sharedMesh.bounds; // �ֲ�
         Vector3[] localCorners = new Vector3[]
         {
-            new Vector3(localBounds.min.x, localBounds.min.y, localBounds.min.z),
-            new Vector3(localBounds.max.x, localBounds.min.y, localBounds.min.z),
-            new Vector3(localBounds.min.x, localBounds.max.y, localBounds.min.z),
-            new Vector3(localBounds.max.x, localBounds.max.y, localBounds.min.z),
-            new Vector3(localBounds.min.x, localBounds.min.y, localBounds.max.z),
-            new Vector3(localBounds.max.x, localBounds.min.y, localBounds.max.z),
-            new Vector3(localBounds.min.x, localBounds.max.y, localBounds.max.z),
-            new Vector3(localBounds.max.x, localBounds.max.y, localBounds.max.z),
+            new Vector3(lb.min.x, lb.min.y, lb.min.z),
+            new Vector3(lb.max.x, lb.min.y, lb.min.z),
+            new Vector3(lb.min.x, lb.max.y, lb.min.z),
+            new Vector3(lb.max.x, lb.max.y, lb.min.z),
+            new Vector3(lb.min.x, lb.min.y, lb.max.z),
+            new Vector3(lb.max.x, lb.min.y, lb.max.z),
+            new Vector3(lb.min.x, lb.max.y, lb.max.z),
+            new Vector3(lb.max.x, lb.max.y, lb.max.z),
         };
 
         Vector3 wmin = new Vector3(float.PositiveInfinity, float.PositiveInfinity, float.PositiveInfinity);
         Vector3 wmax = new Vector3(float.NegativeInfinity, float.NegativeInfinity, float.NegativeInfinity);
-
         for (int i = 0; i < 8; i++)
         {
-            Vector3 worldCorner = filter.transform.TransformPoint(localCorners[i]);
-            wmin = Vector3.Min(wmin, worldCorner);
-            wmax = Vector3.Max(wmax, worldCorner);
+            Vector3 w = filter.transform.TransformPoint(localCorners[i]);
+            wmin = Vector3.Min(wmin, w);
+            wmax = Vector3.Max(wmax, w);
         }
 
         worldMin = wmin;
         worldSize = wmax - wmin;
         voxelSize = new Vector3(worldSize.x / size, worldSize.y / size, worldSize.z / size);
-
-        Debug.Log($"工件边界计算: Min={worldMin}, Max={wmax}, Size={worldSize}, VoxelSize={voxelSize}");
     }
 
     private void Update()
     {
-        if (!isOn || !isInitialized || cutter == null) return;
+        if (!isOn || voxelizerDemo == null || voxelizerDemo.m_voxelizer == null || cutter == null) return;
 
-        // 验证关键坐标转换
-        if (Time.frameCount % 120 == 0) // 每2秒验证一次
-        {
-            ValidateCoordinateSystem();
-        }
+        //Debug.Log($"Cutter世界坐标: {cutter.position}");
+        //Debug.Log($"Workpiece世界Min: {worldMin}");
+        //Debug.Log($"Workpiece世界Size: {worldSize}");
+        //Debug.Log($"VoxelSize: {voxelSize}");
 
-        PerformMillingOperation();
-    }
-
-    /// <summary>
-    /// 验证坐标系转换准确性
-    /// </summary>
-    private void ValidateCoordinateSystem()
-    {
-        Debug.Log("=== 坐标系验证 ===");
-        Debug.Log($"刀具世界坐标: {cutter.position}");
-        Debug.Log($"工件世界Min: {worldMin}");
-        Debug.Log($"体素尺寸: {voxelSize}");
-
-        // 测试几个关键点的转换
-        Vector3[] testPoints = new Vector3[]
-        {
-            cutter.position,
-            worldMin,
-            worldMin + worldSize * 0.5f,
-            worldMin + worldSize
-        };
-
-        foreach (Vector3 point in testPoints)
-        {
-            if (WorldToVoxelCoordinate(point, out Vector3Int voxelCoord, out string error))
-            {
-                Vector3 reconstructedWorld = VoxelToWorldCoordinate(voxelCoord);
-                float errorDistance = Vector3.Distance(point, reconstructedWorld);
-                Debug.Log($"点{point} -> 体素{voxelCoord} -> 重建世界{reconstructedWorld}, 误差: {errorDistance:F6}");
-
-                if (errorDistance > coordinateTolerance)
-                {
-                    Debug.LogWarning($"坐标转换误差较大: {errorDistance}");
-                }
-            }
-            else
-            {
-                Debug.LogWarning($"坐标转换失败: {point} - {error}");
-            }
-        }
-        Debug.Log($"统计: 总测试{totalVoxelTests}, 成功切削{successfulCuts}, 转换错误{conversionErrors}");
-        Debug.Log("=== 验证结束 ===");
-    }
-
-    /// <summary>
-    /// 执行铣削操作
-    /// </summary>
-    private void PerformMillingOperation()
-    {
         int[,,] voxels = voxelizerDemo.m_voxelizer.Voxels;
-        if (voxels == null || size <= 0) return;
+        float H = cutterHeight * 0.5f;
+        float R = cutterRadius;
+        //Vector3 C = cutter.position;          // Բ�����ģ����磩
+        //Vector3 N = cutter.up.normalized;     // Բ���������磬������̬��
 
-        float halfHeight = cutterHeight * 0.5f;
-        float radius = cutterRadius;
-        Vector3 cutterCenter = cutter.position;
-        Vector3 cutterDirection = cutter.up.normalized;
+        Vector3 C = cutter.position;          // 刀具中心（世界坐标）
+        Vector3 N = cutter.up.normalized;     // 刀具方向（世界坐标，经过归一化）
 
-        // 计算刀具的AABB用于剪枝
-        CalculateCutterAABB(cutterCenter, cutterDirection, radius, halfHeight, 
-            out Vector3 aabbMin, out Vector3 aabbMax);
-
-        // 转换到体素坐标范围
-        if (!WorldAABBToVoxelRange(aabbMin, aabbMax, 
-            out int ixMin, out int iyMin, out int izMin, 
-            out int ixMax, out int iyMax, out int izMax))
+        // 调试输出：对比Unity编辑器和WebGL的坐标值（用于定位位置偏移问题）
+        #if UNITY_EDITOR || UNITY_WEBGL
+        if (Time.frameCount % 60 == 0) // 每60帧输出一次，避免日志过多
         {
-            return; // 转换失败或无交集
+            Debug.Log($"[MillingManager坐标调试] Cutter世界坐标: {C}, Workpiece世界Min: {worldMin}, Workpiece世界Size: {worldSize}, VoxelSize: {voxelSize}");
         }
+        #endif
+
+        // 步骤 1) 刀具的"包围盒" AABB计算，用于剪枝范围
+
+        // ���� 1) ���ߵġ����� AABB������������Χ��֦
+        Vector3 ext; // ��ߴ�
+        ext.x = R * Mathf.Sqrt(Mathf.Max(0f, 1f - N.x * N.x)) + H * Mathf.Abs(N.x);
+        ext.y = R * Mathf.Sqrt(Mathf.Max(0f, 1f - N.y * N.y)) + H * Mathf.Abs(N.y);
+        ext.z = R * Mathf.Sqrt(Mathf.Max(0f, 1f - N.z * N.z)) + H * Mathf.Abs(N.z);
+        Vector3 cutterAabbMin = C - ext;
+        Vector3 cutterAabbMax = C + ext;
+
+        // ת������������Χ
+        int ixMin = Mathf.FloorToInt((cutterAabbMin.x - worldMin.x) / voxelSize.x);
+        int iyMin = Mathf.FloorToInt((cutterAabbMin.y - worldMin.y) / voxelSize.y);
+        int izMin = Mathf.FloorToInt((cutterAabbMin.z - worldMin.z) / voxelSize.z);
+        int ixMax = Mathf.FloorToInt((cutterAabbMax.x - worldMin.x) / voxelSize.x);
+        int iyMax = Mathf.FloorToInt((cutterAabbMax.y - worldMin.y) / voxelSize.y);
+        int izMax = Mathf.FloorToInt((cutterAabbMax.z - worldMin.z) / voxelSize.z);
+
+        ixMin = Mathf.Clamp(ixMin, 0, size - 1);
+        iyMin = Mathf.Clamp(iyMin, 0, size - 1);
+        izMin = Mathf.Clamp(izMin, 0, size - 1);
+        ixMax = Mathf.Clamp(ixMax, 0, size - 1);
+        iyMax = Mathf.Clamp(iyMax, 0, size - 1);
+        izMax = Mathf.Clamp(izMax, 0, size - 1);
 
         bool modified = false;
-        totalVoxelTests = 0;
-        successfulCuts = 0;
 
-        // 遍历剪枝后的体素范围
+        // WebGL内存安全：确保所有索引都在有效范围内
+        if (voxels == null || size <= 0) return;
+
+        // ���� 2) ������֦��Χ�ڵ����أ�����ƽͷԲ�� vs AABB�������׶��ж�
         for (int z = izMin; z <= izMax; z++)
         {
             for (int y = iyMin; y <= iyMax; y++)
             {
                 for (int x = ixMin; x <= ixMax; x++)
                 {
-                    totalVoxelTests++;
-
-                    // 安全检查
-                    if (!IsVoxelIndexValid(x, y, z) || voxels[x, y, z] == 0)
-                        continue;
-
-                    // 获取体素的世界空间AABB
-                    if (!GetVoxelWorldAABB(x, y, z, out Vector3 vmin, out Vector3 vmax))
+                    //if (voxels[x, y, z] == 0) continue; 
+                    // 双重边界检查：防止WebGL内存越界
+                    if (x < 0 || x >= size || y < 0 || y >= size || z < 0 || z >= size) 
                     {
-                        conversionErrors++;
                         continue;
                     }
 
-                    // 碰撞检测：圆柱体 vs 体素AABB
-                    if (CheckCylinderVoxelCollision(cutterCenter, cutterDirection, radius, halfHeight, vmin, vmax))
+                    try
                     {
+                        if (voxels[x, y, z] == 0) continue;
+                    }
+                    catch (System.Exception e)
+                    {
+                        Debug.LogError($"Voxel访问异常: x={x}, y={y}, z={z}, size={size}, 错误: {e.Message}");
+                        continue;
+                    }
+
+                    // ��ǰ���ص�����AABB
+                    Vector3 vmin = worldMin + new Vector3(x * voxelSize.x, y * voxelSize.y, z * voxelSize.z);
+                    Vector3 vmax = vmin + voxelSize;
+                    Vector3 bCenter = (vmin + vmax) * 0.5f;
+                    Vector3 bHalf = (vmax - vmin) * 0.5f;
+
+                    // (a) �����ص�����AABBͶӰ��N��
+                    float projCenter = Vector3.Dot(N, bCenter - C);
+                    float projRadius = Mathf.Abs(N.x) * bHalf.x + Mathf.Abs(N.y) * bHalf.y + Mathf.Abs(N.z) * bHalf.z;
+                    if (Mathf.Abs(projCenter) > (H + projRadius))
+                        continue; // ��Բ���ĸ߶ȷ�Χ���ص�
+
+                    // (b) ������룺����ֱ��(C + tN) �� AABB ���������
+                    float sqrDist = SqrDistanceLineAABB(C, N, vmin, vmax);
+                    if (sqrDist <= R * R)
+                    {
+                        // 调试输出：记录切削时的体素坐标和世界坐标
+                        #if UNITY_EDITOR || UNITY_WEBGL
+                        if (!modified) // 只在第一次切削时输出，避免日志过多
+                        {
+                            Debug.Log($"[切削检测] 体素索引({x},{y},{z}), 体素世界坐标vmin={vmin}, vmax={vmax}, 刀具世界坐标C={C}, 距离sqrDist={sqrDist}");
+                        }
+                        #endif
+                        
                         try
                         {
                             voxels[x, y, z] = 0;
                             modified = true;
-                            successfulCuts++;
                         }
                         catch (System.Exception e)
                         {
-                            Debug.LogError($"体素写入异常: ({x},{y},{z}) - {e.Message}");
+                            Debug.LogError($"Voxel写入异常: x={x}, y={y}, z={z}, 错误: {e.Message}");
+                            break; // 如果写入失败，退出内层循环
                         }
                     }
                 }
             }
         }
 
-        // 需要时更新网格
+        // ���� 3) ֻ���޸ķ����ҵ���ϲ����ʱ�ؽ�����
         if (modified)
         {
             updateTimer += Time.deltaTime;
@@ -239,174 +193,34 @@ public class MillingManager : MonoBehaviour
     }
 
     /// <summary>
-    /// 世界坐标转换为体素坐标（高精度版本）
+    /// ����ֱ�� (P = C + t*N, t��R) �� AABB([bmin,bmax]) ���������ƽ����
+    /// ������ͶӰ-��ȡ������3���ڷǳ��ȡ�
     /// </summary>
-    private bool WorldToVoxelCoordinate(Vector3 worldPos, out Vector3Int voxelCoord, out string error)
+    private static float SqrDistanceLineAABB(Vector3 C, Vector3 N, Vector3 bmin, Vector3 bmax)
     {
-        voxelCoord = Vector3Int.zero;
-        error = null;
-
-        // 检查是否在工件范围内
-        if (worldPos.x < worldMin.x - coordinateTolerance || worldPos.x > worldMin.x + worldSize.x + coordinateTolerance ||
-            worldPos.y < worldMin.y - coordinateTolerance || worldPos.y > worldMin.y + worldSize.y + coordinateTolerance ||
-            worldPos.z < worldMin.z - coordinateTolerance || worldPos.z > worldMin.z + worldSize.z + coordinateTolerance)
-        {
-            error = "坐标超出工件范围";
-            return false;
-        }
-
-        try
-        {
-            // 使用更精确的转换方法
-            Vector3 localPos = worldPos - worldMin;
-            
-            if (enablePrecisionMode)
-            {
-                // WebGL精度模式：使用更稳定的计算方法
-                voxelCoord.x = Mathf.Clamp(Mathf.FloorToInt(localPos.x / voxelSize.x + 0.0001f), 0, size - 1);
-                voxelCoord.y = Mathf.Clamp(Mathf.FloorToInt(localPos.y / voxelSize.y + 0.0001f), 0, size - 1);
-                voxelCoord.z = Mathf.Clamp(Mathf.FloorToInt(localPos.z / voxelSize.z + 0.0001f), 0, size - 1);
-            }
-            else
-            {
-                // 标准模式
-                voxelCoord.x = Mathf.Clamp(Mathf.FloorToInt(localPos.x / voxelSize.x), 0, size - 1);
-                voxelCoord.y = Mathf.Clamp(Mathf.FloorToInt(localPos.y / voxelSize.y), 0, size - 1);
-                voxelCoord.z = Mathf.Clamp(Mathf.FloorToInt(localPos.z / voxelSize.z), 0, size - 1);
-            }
-
-            return true;
-        }
-        catch (System.Exception e)
-        {
-            error = $"转换异常: {e.Message}";
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// 体素坐标转换回世界坐标（用于验证）
-    /// </summary>
-    private Vector3 VoxelToWorldCoordinate(Vector3Int voxelCoord)
-    {
-        Vector3 localPos = new Vector3(
-            (voxelCoord.x + 0.5f) * voxelSize.x,  // 使用体素中心点
-            (voxelCoord.y + 0.5f) * voxelSize.y,
-            (voxelCoord.z + 0.5f) * voxelSize.z
-        );
-        return worldMin + localPos;
-    }
-
-    /// <summary>
-    /// 世界空间AABB转换为体素索引范围
-    /// </summary>
-    private bool WorldAABBToVoxelRange(Vector3 worldMinAABB, Vector3 worldMaxAABB,
-        out int xMin, out int yMin, out int zMin, out int xMax, out int yMax, out int zMax)
-    {
-        xMin = yMin = zMin = 0;
-        xMax = yMax = zMax = 0;
-
-        string minError = null;
-        string maxError = null;
-        
-        if (!WorldToVoxelCoordinate(worldMinAABB, out Vector3Int minCoord, out minError) ||
-            !WorldToVoxelCoordinate(worldMaxAABB, out Vector3Int maxCoord, out maxError))
-        {
-            Debug.LogWarning($"AABB转换失败: MinError={minError}, MaxError={maxError}");
-            return false;
-        }
-
-        // 扩展1个体素以确保边界情况
-        xMin = Mathf.Clamp(minCoord.x - 1, 0, size - 1);
-        yMin = Mathf.Clamp(minCoord.y - 1, 0, size - 1);
-        zMin = Mathf.Clamp(minCoord.z - 1, 0, size - 1);
-        xMax = Mathf.Clamp(maxCoord.x + 1, 0, size - 1);
-        yMax = Mathf.Clamp(maxCoord.y + 1, 0, size - 1);
-        zMax = Mathf.Clamp(maxCoord.z + 1, 0, size - 1);
-
-        return true;
-    }
-
-    /// <summary>
-    /// 计算刀具的包围盒AABB
-    /// </summary>
-    private void CalculateCutterAABB(Vector3 center, Vector3 direction, float radius, float halfHeight,
-        out Vector3 aabbMin, out Vector3 aabbMax)
-    {
-        Vector3 ext = new Vector3(
-            radius * Mathf.Sqrt(Mathf.Max(0f, 1f - direction.x * direction.x)) + halfHeight * Mathf.Abs(direction.x),
-            radius * Mathf.Sqrt(Mathf.Max(0f, 1f - direction.y * direction.y)) + halfHeight * Mathf.Abs(direction.y),
-            radius * Mathf.Sqrt(Mathf.Max(0f, 1f - direction.z * direction.z)) + halfHeight * Mathf.Abs(direction.z)
-        );
-
-        aabbMin = center - ext;
-        aabbMax = center + ext;
-    }
-
-    /// <summary>
-    /// 获取体素的世界空间AABB
-    /// </summary>
-    private bool GetVoxelWorldAABB(int x, int y, int z, out Vector3 vmin, out Vector3 vmax)
-    {
-        vmin = worldMin + new Vector3(x * voxelSize.x, y * voxelSize.y, z * voxelSize.z);
-        vmax = vmin + voxelSize;
-        return true;
-    }
-
-    /// <summary>
-    /// 检查圆柱体与体素AABB的碰撞
-    /// </summary>
-    private bool CheckCylinderVoxelCollision(Vector3 C, Vector3 N, float R, float H, Vector3 vmin, Vector3 vmax)
-    {
-        Vector3 bCenter = (vmin + vmax) * 0.5f;
-        Vector3 bHalf = (vmax - vmin) * 0.5f;
-
-        // 高度方向投影检测
-        float projCenter = Vector3.Dot(N, bCenter - C);
-        float projRadius = Mathf.Abs(N.x) * bHalf.x + Mathf.Abs(N.y) * bHalf.y + Mathf.Abs(N.z) * bHalf.z;
-        
-        if (Mathf.Abs(projCenter) > (H + projRadius))
-            return false;
-
-        // 距离检测
-        float sqrDist = SqrDistanceLineAABB(C, N, vmin, vmax);
-        return sqrDist <= R * R;
-    }
-
-    /// <summary>
-    /// 验证体素索引是否有效
-    /// </summary>
-    private bool IsVoxelIndexValid(int x, int y, int z)
-    {
-        return x >= 0 && x < size && y >= 0 && y < size && z >= 0 && z < size;
-    }
-
-    /// <summary>
-    /// 计算直线与AABB的最短距离平方
-    /// </summary>
-    private static float SqrDistanceLineAABB(Vector3 linePoint, Vector3 lineDir, Vector3 aabbMin, Vector3 aabbMax)
-    {
+        // ��ʼ���Ȱ����ϵ�ĳ�㣨������C����ȡ�������ϵõ�p
         Vector3 p = new Vector3(
-            Mathf.Clamp(linePoint.x, aabbMin.x, aabbMax.x),
-            Mathf.Clamp(linePoint.y, aabbMin.y, aabbMax.y),
-            Mathf.Clamp(linePoint.z, aabbMin.z, aabbMax.z)
+            Mathf.Clamp(C.x, bmin.x, bmax.x),
+            Mathf.Clamp(C.y, bmin.y, bmax.y),
+            Mathf.Clamp(C.z, bmin.z, bmax.z)
         );
 
-        float t = Vector3.Dot(lineDir, p - linePoint);
-        Vector3 q = linePoint + lineDir * t;
+        float t = Vector3.Dot(N, p - C);
+        Vector3 q = C + N * t; // ���ϵ�����㣨��Ե�ǰp��
 
-        for (int i = 0; i < LINE_AABB_ITERATIONS; i++)
+        // ����������3~4���㹻��
+        for (int i = 0; i < 3; i++)
         {
             p = new Vector3(
-                Mathf.Clamp(q.x, aabbMin.x, aabbMax.x),
-                Mathf.Clamp(q.y, aabbMin.y, aabbMax.y),
-                Mathf.Clamp(q.z, aabbMin.z, aabbMax.z)
+                Mathf.Clamp(q.x, bmin.x, bmax.x),
+                Mathf.Clamp(q.y, bmin.y, bmax.y),
+                Mathf.Clamp(q.z, bmin.z, bmax.z)
             );
-            t = Vector3.Dot(lineDir, p - linePoint);
-            q = linePoint + lineDir * t;
+            t = Vector3.Dot(N, p - C);
+            q = C + N * t;
 
-            if ((p - q).sqrMagnitude < DISTANCE_EPSILON)
-                break;
+            // ��ѡ����ǰ�����ж�
+            // if ((p - q).sqrMagnitude < 1e-10f) break;
         }
 
         return (q - p).sqrMagnitude;
@@ -415,24 +229,24 @@ public class MillingManager : MonoBehaviour
 #if UNITY_EDITOR
     private void OnDrawGizmos()
     {
-        if (!drawDebugGizmos || cutter == null || !isInitialized) return;
+        if (!drawDebugGizmos || cutter == null) return;
+        float H = cutterHeight * 0.5f;
+        float R = cutterRadius;
+        Vector3 C = cutter.position;
+        Vector3 N = cutter.up.normalized;
 
-        float halfHeight = cutterHeight * 0.5f;
-        float radius = cutterRadius;
-        Vector3 center = cutter.position;
-        Vector3 direction = cutter.up.normalized;
+        Vector3 ext;
+        ext.x = R * Mathf.Sqrt(Mathf.Max(0f, 1f - N.x * N.x)) + H * Mathf.Abs(N.x);
+        ext.y = R * Mathf.Sqrt(Mathf.Max(0f, 1f - N.y * N.y)) + H * Mathf.Abs(N.y);
+        ext.z = R * Mathf.Sqrt(Mathf.Max(0f, 1f - N.z * N.z)) + H * Mathf.Abs(N.z);
 
-        CalculateCutterAABB(center, direction, radius, halfHeight, out Vector3 aabbMin, out Vector3 aabbMax);
-
-        // 绘制刀具AABB
         Gizmos.color = Color.cyan;
-        Vector3 aabbCenter = (aabbMin + aabbMax) * 0.5f;
-        Vector3 aabbSize = aabbMax - aabbMin;
-        Gizmos.DrawWireCube(aabbCenter, aabbSize);
-
-        // 绘制工件边界
-        Gizmos.color = Color.yellow;
-        Gizmos.DrawWireCube(worldMin + worldSize * 0.5f, worldSize);
+        // ������AABB��������+��ߴ续һ���߿�У�
+        Vector3 aabbMin = C - ext;
+        Vector3 aabbMax = C + ext;
+        Vector3 center = (aabbMin + aabbMax) * 0.5f;
+        Vector3 size = (aabbMax - aabbMin);
+        Gizmos.DrawWireCube(center, size);
     }
 #endif
 }
