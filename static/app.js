@@ -1329,3 +1329,75 @@ function setWorkpiecePosition() {
         updateDebugInfo('错误：移动工件失败 - ' + error.message);
     }
 }
+
+// 设置工件旋转角度
+function setWorkpieceRotation() {
+    // 检查Unity集成是否可用
+    if (!window.unityIntegration) {
+        console.error('window.unityIntegration未初始化');
+        updateDebugInfo('错误：Unity集成模块未初始化');
+        return;
+    }
+    
+    // 检查Unity实例是否可用
+    const inst = window.unityIntegration.unityInstance;
+    if (!inst) {
+        console.error('Unity实例未加载完成，无法旋转工件');
+        updateDebugInfo('错误：Unity实例未加载完成');
+        return;
+    }
+    
+    // 查找旋转角度输入框
+    const workpieceRotationXInput = document.getElementById('workpieceRotationX');
+    const workpieceRotationYInput = document.getElementById('workpieceRotationY');
+    const workpieceRotationZInput = document.getElementById('workpieceRotationZ');
+    
+    // 如果输入框不存在，报错
+    if (!workpieceRotationXInput || !workpieceRotationYInput || !workpieceRotationZInput) {
+        console.error('未找到旋转角度输入元素');
+        updateDebugInfo('错误：未找到旋转角度输入元素');
+        return;
+    }
+    
+    // 获取输入值
+    const rotXValue = String(workpieceRotationXInput.value || '').trim();
+    const rotYValue = String(workpieceRotationYInput.value || '').trim();
+    const rotZValue = String(workpieceRotationZInput.value || '').trim();
+    
+    // 如果输入为空，使用0
+    const rotX = rotXValue === '' ? 0 : parseFloat(rotXValue);
+    const rotY = rotYValue === '' ? 0 : parseFloat(rotYValue);
+    const rotZ = rotZValue === '' ? 0 : parseFloat(rotZValue);
+    
+    // 验证输入值是否为有效数字
+    if (isNaN(rotX) || isNaN(rotY) || isNaN(rotZ)) {
+        console.error('无效的旋转角度值 - X:', rotXValue, 'Y:', rotYValue, 'Z:', rotZValue);
+        updateDebugInfo('错误：请输入有效的数字旋转角度');
+        return;
+    }
+    
+    // 构建旋转角度字符串
+    const rotationStr = `${rotX},${rotY},${rotZ}`;
+    
+    try {
+        console.log('准备发送旋转消息到Unity:');
+        console.log('  GameObject名称: WorkpieceManager');
+        console.log('  方法名称: WebGL_RotateWorkpiece');
+        console.log('  参数（旋转角度）:', rotationStr);
+        
+        // 调用Unity中的WorkpieceManager旋转工件
+        inst.SendMessage('WorkpieceManager', 'WebGL_RotateWorkpiece', rotationStr);
+        
+        console.log('旋转消息已发送到Unity');
+        
+        if (cncClient) {
+            cncClient.log(`旋转工件: X角度=${rotX}, Y角度=${rotY}, Z角度=${rotZ}`, 'info');
+        }
+        
+        console.log(`旋转工件成功: X角度=${rotX}, Y角度=${rotY}, Z角度=${rotZ}`);
+        updateDebugInfo(`已旋转工件: X角度=${rotX}, Y角度=${rotY}, Z角度=${rotZ}`);
+    } catch (error) {
+        console.error('旋转工件时出错:', error);
+        updateDebugInfo('错误：旋转工件失败 - ' + error.message);
+    }
+}

@@ -218,13 +218,13 @@ public class WorkpieceManager : MonoBehaviour
     /// <param name="offsetY">Y轴偏移量</param>
     /// <param name="offsetZ">Z轴偏移量</param>
     public void MoveCurrentWorkpiece(float offsetX, float offsetY, float offsetZ)
-    {        
+    {
         if (currentWorkpiece != null)
-        {            
+        {
             Vector3 oldPosition = currentWorkpiece.GetPosition();
             Vector3 offset = new Vector3(offsetX, offsetY, offsetZ);
             
-            if (debugMode) 
+            if (debugMode)
             {
                 Debug.Log($"WorkpieceManager: 准备移动工件");
                 Debug.Log($"  当前工件: {currentWorkpiece.workpieceName}");
@@ -235,22 +235,55 @@ public class WorkpieceManager : MonoBehaviour
             currentWorkpiece.MoveByOffset(offset);
             
             Vector3 newPosition = currentWorkpiece.GetPosition();
-            if (debugMode) 
+            if (debugMode)
             {
                 Debug.Log($"WorkpieceManager: 移动完成，新位置: {newPosition}");
                 Debug.Log($"WorkpieceManager: 实际移动距离: {Vector3.Distance(oldPosition, newPosition)}");
             }
         }
         else
-        {            
+        {
             Debug.LogWarning("WorkpieceManager: 没有活动的工件！无法移动。");
+            Debug.LogWarning($"WorkpieceManager: 当前工件索引: {currentWorkpieceIndex}, 工件列表数量: {workpieces.Count}");
+        }
+    }
+    
+    /// <summary>
+    /// 旋转当前工件（相对旋转）
+    /// </summary>
+    /// <param name="rotationX">X轴旋转角度</param>
+    /// <param name="rotationY">Y轴旋转角度</param>
+    /// <param name="rotationZ">Z轴旋转角度</param>
+    public void RotateCurrentWorkpiece(float rotationX, float rotationY, float rotationZ)
+    {
+        if (currentWorkpiece != null)
+        {
+            Vector3 rotationOffset = new Vector3(rotationX, rotationY, rotationZ);
+            
+            if (debugMode)
+            {
+                Debug.Log($"WorkpieceManager: 准备旋转工件");
+                Debug.Log($"  当前工件: {currentWorkpiece.workpieceName}");
+                Debug.Log($"  旋转偏移: {rotationOffset}");
+            }
+            
+            currentWorkpiece.RotateByOffset(rotationOffset);
+            
+            if (debugMode)
+            {
+                Debug.Log($"WorkpieceManager: 旋转完成");
+            }
+        }
+        else
+        {
+            Debug.LogWarning("WorkpieceManager: 没有活动的工件！无法旋转。");
             Debug.LogWarning($"WorkpieceManager: 当前工件索引: {currentWorkpieceIndex}, 工件列表数量: {workpieces.Count}");
         }
     }
     
     // 用于WebGL调用的方法
     public void WebGL_SetWorkpiecePosition(string positionString)
-    {        
+    {
         Debug.Log($"WorkpieceManager: ===== 收到WebGL位置设置请求 =====");
         Debug.Log($"WorkpieceManager: 接收到的字符串: '{positionString}'");
         Debug.Log($"WorkpieceManager: 当前工件索引: {currentWorkpieceIndex}");
@@ -262,7 +295,7 @@ public class WorkpieceManager : MonoBehaviour
         Debug.Log($"WorkpieceManager: 分割后的部分数量: {positionParts.Length}");
         
         if (positionParts.Length == 3)
-        {            
+        {
             float xPos, yPos, zPos;
             bool xOk = float.TryParse(positionParts[0].Trim(), out xPos);
             bool yOk = float.TryParse(positionParts[1].Trim(), out yPos);
@@ -271,64 +304,92 @@ public class WorkpieceManager : MonoBehaviour
             Debug.Log($"WorkpieceManager: 解析结果 - X: {xPos} (成功: {xOk}), Y: {yPos} (成功: {yOk}), Z: {zPos} (成功: {zOk})");
             
             if (xOk && yOk && zOk)
-            {                
+            {
                 SetCurrentWorkpiecePosition(xPos, yPos, zPos);
                 Debug.Log($"WorkpieceManager: ===== 从WebGL设置工件位置完成 =====");
             }
             else
-            {                
+            {
                 Debug.LogWarning($"WorkpieceManager: 无效的坐标数值格式！无法解析: {positionString}");
                 Debug.LogWarning($"WorkpieceManager: X解析: {xOk}, Y解析: {yOk}, Z解析: {zOk}");
             }
         }
         else
-        {            
+        {
             Debug.LogWarning($"WorkpieceManager: 无效的坐标字符串格式！预期格式: x,y,z，收到: {positionString}");
             Debug.LogWarning($"WorkpieceManager: 分割后的部分: [{string.Join(", ", positionParts)}]");
         }
     }
     
     public void WebGL_SwitchToWorkpiece(string index)
-    {        
+    {
         if (debugMode) Debug.Log($"WorkpieceManager: 收到WebGL切换工件请求: {index}");
         
         int workpieceIndex;
         if (int.TryParse(index, out workpieceIndex))
-        {            
+        {
             SwitchToWorkpiece(workpieceIndex);
             if (debugMode) Debug.Log($"WorkpieceManager: WebGL切换工件成功，索引: {workpieceIndex}");
         }
         else
-        {            
+        {
             Debug.LogWarning($"WorkpieceManager: 无效的工件索引格式！无法解析: {index}");
         }
     }
     
     // 用于WebGL调用的移动方法
     public void WebGL_MoveWorkpiece(string offsetString)
-    {        
+    {
         if (debugMode) Debug.Log($"WorkpieceManager: 收到WebGL移动工件请求: {offsetString}");
         
         // 解析格式为 "x,y,z" 的字符串
         string[] offsetParts = offsetString.Split(',');
         if (offsetParts.Length == 3)
-        {            
+        {
             float offsetX, offsetY, offsetZ;
             if (float.TryParse(offsetParts[0].Trim(), out offsetX) && 
                 float.TryParse(offsetParts[1].Trim(), out offsetY) && 
                 float.TryParse(offsetParts[2].Trim(), out offsetZ))
-            {                
+            {
                 MoveCurrentWorkpiece(offsetX, offsetY, offsetZ);
                 if (debugMode) Debug.Log($"WorkpieceManager: 从WebGL移动工件成功: X偏移={offsetX}, Y偏移={offsetY}, Z偏移={offsetZ}");
             }
             else
-            {                
+            {
                 Debug.LogWarning($"WorkpieceManager: 无效的偏移量数值格式！无法解析: {offsetString}");
             }
         }
         else
-        {            
+        {
             Debug.LogWarning($"WorkpieceManager: 无效的偏移量字符串格式！预期格式: x,y,z，收到: {offsetString}");
+        }
+    }
+    
+    // 用于WebGL调用的旋转方法
+    public void WebGL_RotateWorkpiece(string rotationString)
+    {
+        if (debugMode) Debug.Log($"WorkpieceManager: 收到WebGL旋转工件请求: {rotationString}");
+        
+        // 解析格式为 "x,y,z" 的字符串
+        string[] rotationParts = rotationString.Split(',');
+        if (rotationParts.Length == 3)
+        {
+            float rotationX, rotationY, rotationZ;
+            if (float.TryParse(rotationParts[0].Trim(), out rotationX) && 
+                float.TryParse(rotationParts[1].Trim(), out rotationY) && 
+                float.TryParse(rotationParts[2].Trim(), out rotationZ))
+            {
+                RotateCurrentWorkpiece(rotationX, rotationY, rotationZ);
+                if (debugMode) Debug.Log($"WorkpieceManager: 从WebGL旋转工件成功: X旋转={rotationX}, Y旋转={rotationY}, Z旋转={rotationZ}");
+            }
+            else
+            {
+                Debug.LogWarning($"WorkpieceManager: 无效的旋转角度数值格式！无法解析: {rotationString}");
+            }
+        }
+        else
+        {
+            Debug.LogWarning($"WorkpieceManager: 无效的旋转角度字符串格式！预期格式: x,y,z，收到: {rotationString}");
         }
     }
 }

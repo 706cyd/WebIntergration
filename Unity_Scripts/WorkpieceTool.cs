@@ -15,6 +15,10 @@ public class WorkpieceTool : MonoBehaviour
     private bool isPositionLocked = false;
     private Vector3 lockedPosition;
     
+    // 用于防止旋转被其他脚本重置的标志
+    private bool isRotationLocked = false;
+    private Quaternion lockedRotation;
+    
     // 当脚本启用时调用
     private void Awake()
     {
@@ -35,7 +39,7 @@ public class WorkpieceTool : MonoBehaviour
         CheckAndRestorePosition();
     }
     
-    // 检查并恢复位置的统一方法
+    // 检查并恢复位置和旋转的统一方法
     private void CheckAndRestorePosition()
     {
         // 如果位置被锁定，确保位置不被其他脚本改变
@@ -101,6 +105,35 @@ public class WorkpieceTool : MonoBehaviour
                 // 恢复位置
                 transform.position = lockedPosition;
                 Debug.LogWarning($"  已恢复到锁定位置: {lockedPosition}");
+            }
+        }
+        
+        // 如果旋转被锁定，确保旋转不被其他脚本改变
+        if (isRotationLocked && transform != null)
+        {
+            // 检查旋转是否被改变
+            Quaternion currentRot = transform.rotation;
+            float angleDiff = Quaternion.Angle(currentRot, lockedRotation);
+            
+            if (angleDiff > 0.001f)
+            {
+                Debug.LogWarning($"WorkpieceTool [{workpieceName}]: ===== 检测到旋转被其他脚本重置！ =====");
+                Debug.LogWarning($"  当前帧: {Time.frameCount}");
+                Debug.LogWarning($"  当前时间: {Time.time}");
+                Debug.LogWarning($"  当前旋转: {currentRot.eulerAngles}");
+                Debug.LogWarning($"  锁定旋转: {lockedRotation.eulerAngles}");
+                Debug.LogWarning($"  旋转差异: {angleDiff}度");
+                
+                // 检查是否有物理组件
+                Rigidbody rb = GetComponent<Rigidbody>();
+                if (rb != null)
+                {
+                    Debug.LogWarning($"  检测到Rigidbody组件！旋转: {rb.rotation.eulerAngles}, 是否运动学: {rb.isKinematic}");
+                }
+                
+                // 恢复旋转
+                transform.rotation = lockedRotation;
+                Debug.LogWarning($"  已恢复到锁定旋转: {lockedRotation.eulerAngles}");
             }
         }
     }
@@ -279,5 +312,173 @@ public class WorkpieceTool : MonoBehaviour
     public Vector3 GetPosition()
     {
         return transform.position;
+    }
+    
+    /// <summary>
+    /// 设置当前工件的旋转角度（世界坐标）
+    /// </summary>
+    /// <param name="rotation">新的旋转角度（欧拉角）</param>
+    public void SetRotation(Vector3 rotation)
+    {
+        if (transform != null)
+        {
+            Quaternion oldRotation = transform.rotation;
+            
+            // 设置世界旋转
+            transform.rotation = Quaternion.Euler(rotation);
+            
+            Quaternion actualRotation = transform.rotation;
+            
+            Debug.Log($"WorkpieceTool [{workpieceName}]: ===== 设置旋转 =====");
+            Debug.Log($"  GameObject名称: {gameObject.name}");
+            Debug.Log($"  旧旋转角度: {oldRotation.eulerAngles}");
+            Debug.Log($"  设置的旋转角度: {rotation}");
+            Debug.Log($"  实际旋转角度: {actualRotation.eulerAngles}");
+            
+            if (transform.parent != null)
+            {
+                Debug.Log($"  Transform父对象: {transform.parent.name}");
+            }
+            else
+            {
+                Debug.Log($"  Transform父对象: 无");
+            }
+            
+            // 检查旋转是否真的改变了
+            float rotationChange = Quaternion.Angle(oldRotation, actualRotation);
+            Debug.Log($"  旋转变化角度: {rotationChange}");
+            
+            if (rotationChange < 0.001f)
+            {
+                Debug.LogWarning($"WorkpieceTool [{workpieceName}]: 警告！旋转似乎没有改变！");
+            }
+            else
+            {
+                Debug.Log($"WorkpieceTool [{workpieceName}]: ✓ 旋转已成功改变！");
+            }
+        }
+        else
+        {
+            Debug.LogError($"WorkpieceTool [{workpieceName}]: Transform为空，无法设置旋转！");
+        }
+    }
+    
+    /// <summary>
+    /// 设置当前工件的本地旋转角度
+    /// </summary>
+    /// <param name="localRotation">新的本地旋转角度（欧拉角）</param>
+    public void SetLocalRotation(Vector3 localRotation)
+    {
+        if (transform != null)
+        {
+            Quaternion oldLocalRotation = transform.localRotation;
+            
+            // 设置本地旋转
+            transform.localRotation = Quaternion.Euler(localRotation);
+            
+            Quaternion actualLocalRotation = transform.localRotation;
+            
+            Debug.Log($"WorkpieceTool [{workpieceName}]: ===== 设置本地旋转 =====");
+            Debug.Log($"  GameObject名称: {gameObject.name}");
+            Debug.Log($"  旧本地旋转角度: {oldLocalRotation.eulerAngles}");
+            Debug.Log($"  设置的本地旋转角度: {localRotation}");
+            Debug.Log($"  实际本地旋转角度: {actualLocalRotation.eulerAngles}");
+            Debug.Log($"  世界旋转角度: {transform.rotation.eulerAngles}");
+            
+            if (transform.parent != null)
+            {
+                Debug.Log($"  Transform父对象: {transform.parent.name}");
+            }
+            else
+            {
+                Debug.Log($"  Transform父对象: 无");
+            }
+        }
+        else
+        {
+            Debug.LogError($"WorkpieceTool [{workpieceName}]: Transform为空，无法设置本地旋转！");
+        }
+    }
+    
+    /// <summary>
+    /// 根据偏移量旋转工件
+    /// </summary>
+    /// <param name="rotationOffset">旋转的偏移量（欧拉角）</param>
+    public void RotateByOffset(Vector3 rotationOffset)
+    {
+        if (transform != null)
+        {
+            Quaternion oldRotation = transform.rotation;
+            Vector3 oldEulerAngles = oldRotation.eulerAngles;
+            
+            // 根据偏移量旋转工件
+            transform.rotation *= Quaternion.Euler(rotationOffset);
+            
+            Quaternion newRotation = transform.rotation;
+            Vector3 newEulerAngles = newRotation.eulerAngles;
+            
+            // 锁定新旋转，防止被其他脚本重置
+            isRotationLocked = true;
+            lockedRotation = newRotation;
+            
+            Debug.Log($"WorkpieceTool [{workpieceName}]: ===== 相对旋转 =====");
+            Debug.Log($"  GameObject名称: {gameObject.name}");
+            Debug.Log($"  旧旋转角度: {oldEulerAngles}");
+            Debug.Log($"  旋转偏移: {rotationOffset}");
+            Debug.Log($"  新旋转角度: {newEulerAngles}");
+            Debug.Log($"  旋转已锁定: {isRotationLocked}");
+            
+            if (transform.parent != null)
+            {
+                Debug.Log($"  父对象: {transform.parent.name}");
+                Debug.Log($"  父对象旋转: {transform.parent.rotation.eulerAngles}");
+            }
+            
+            float actualRotationChange = Quaternion.Angle(oldRotation, newRotation);
+            Debug.Log($"  实际旋转变化角度: {actualRotationChange}");
+            Debug.Log($"WorkpieceTool [{workpieceName}]: ✓ 旋转完成");
+        }
+        else
+        {
+            Debug.LogError($"WorkpieceTool [{workpieceName}]: Transform为空，无法旋转！");
+        }
+    }
+    
+    /// <summary>
+    /// 解锁旋转（允许其他脚本修改旋转）
+    /// </summary>
+    public void UnlockRotation()
+    {
+        isRotationLocked = false;
+        Debug.Log($"WorkpieceTool [{workpieceName}]: 旋转已解锁");
+    }
+    
+    /// <summary>
+    /// 锁定当前旋转
+    /// </summary>
+    public void LockRotation()
+    {
+        if (transform != null)
+        {
+            isRotationLocked = true;
+            lockedRotation = transform.rotation;
+            Debug.Log($"WorkpieceTool [{workpieceName}]: 旋转已锁定在 {lockedRotation.eulerAngles}");
+        }
+    }
+    
+    /// <summary>
+    /// 获取当前工件的旋转角度
+    /// </summary>
+    public Vector3 GetRotation()
+    {
+        return transform.rotation.eulerAngles;
+    }
+    
+    /// <summary>
+    /// 获取当前工件的本地旋转角度
+    /// </summary>
+    public Vector3 GetLocalRotation()
+    {
+        return transform.localRotation.eulerAngles;
     }
 }

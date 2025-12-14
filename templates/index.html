@@ -3,2227 +3,714 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>五轴数控机床仿真器</title>
+    <title>TwinCNC - 五轴数控机床仿真系统</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    
     <style>
-        /* 菜单栏样式 */
-        .menu-bar {
-            background-color: #2d2d30;
-            color: #cccccc;
-            height: 40px;
+        :root {
+            --bg-dark: #1e1e1e;
+            --bg-panel: #252526;
+            --bg-header: #2d2d2d;
+            --border-color: #3e3e42;
+            --text-primary: #cccccc;
+            --text-highlight: #ffffff;
+            --accent-blue: #007acc;
+            --accent-green: #4ec9b0;
+            --accent-orange: #ce9178;
+            --danger: #f14c4c;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-primary);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: grid;
+            grid-template-rows: 45px 1fr 200px; /* 顶栏, 主内容, 底栏 */
+            margin: 0;
+            padding: 0;
+        }
+
+        /* --- 1. 顶部导航栏 --- */
+        .industrial-header {
+            background-color: var(--bg-header);
+            border-bottom: 1px solid var(--border-color);
             display: flex;
             align-items: center;
             padding: 0 15px;
-            border-bottom: 1px solid #3e3e42;
-            font-size: 13px;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            z-index: 1002;
-        }
-        
-        /* 标签页样式控制 - 确保所有标签页宽度一致且无滚动条 */
-        .tab-pane {
-            overflow: hidden;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        
-        /* 行程测试标签页特殊样式控制 */
-        #travel-content {
-            overflow: hidden;
-            width: 100%;
-            box-sizing: border-box;
-        }
-        
-        /* 进度条区域样式控制 */
-        #travelTestStatus {
-            width: 100%;
-            max-width: 100%;
-            box-sizing: border-box;
-        }
-        
-        /* 确保卡片内容不会导致溢出 */
-        #travel-content .card {
-            box-sizing: border-box;
-            width: 100%;
-        }
-        
-        #travel-content .card-body {
-            overflow: hidden;
-            box-sizing: border-box;
-        }
-        
-        .menu-item {
-            padding: 5px 10px;
-            cursor: pointer;
-            border-radius: 3px;
-            transition: background-color 0.2s;
-            position: relative;
-        }
-        
-        .menu-item:hover {
-            background-color: #3e3e42;
-        }
-        
-        /* 菜单下拉样式 */
-        .menu-dropdown {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            background-color: #2d2d30;
-            border: 1px solid #3e3e42;
-            border-radius: 3px;
-            min-width: 200px;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-            z-index: 1003;
-            display: none;
-        }
-        
-        .menu-item:hover .menu-dropdown {
-            display: block;
-        }
-        
-        .menu-dropdown-item {
-            padding: 8px 15px;
-            cursor: pointer;
-            border-bottom: 1px solid #3e3e42;
-            font-size: 12px;
-        }
-        
-        .menu-dropdown-item:last-child {
-            border-bottom: none;
-        }
-        
-        .menu-dropdown-item:hover {
-            background-color: #3e3e42;
-        }
-        
-        .menu-dropdown-item i {
-            margin-right: 8px;
-            width: 16px;
-        }
-        
-        /* Logo样式 */
-        .app-logo {
-            display: flex;
-            align-items: center;
-            margin-right: 20px;
-            padding: 5px;
-            color: #cccccc;
-            font-size: 18px;
-            text-decoration: none;
-        }
-        
-        .app-logo:hover {
-            color: #cccccc;
-            text-decoration: none;
-        }
-        
-        /* 侧边栏样式 */
-        .sidebar {
-            background-color: #252526;
-            color: #cccccc;
-            width: 250px;
-            height: calc(100vh - 40px);
-            position: fixed;
-            left: 0;
-            top: 40px;
+            justify-content: space-between;
             z-index: 1000;
-            transition: transform 0.3s ease;
-            border-right: 1px solid #3e3e42;
-            overflow-y: auto;
         }
-        
-        .sidebar.collapsed {
-            transform: translateX(-250px);
-        }
-        
-        .sidebar-toggle {
-            position: fixed;
-            left: 0;
-            top: 40px;
-            width: 30px;
-            height: 30px;
-            background-color: #2d2d30;
-            border: none;
-            color: #cccccc;
-            cursor: pointer;
-            z-index: 1001;
-            border-right: 1px solid #3e3e42;
-            transition: transform 0.3s ease;
+
+        .brand-area {
             display: flex;
             align-items: center;
-            justify-content: center;
-            font-size: 12px;
-        }
-        
-        .sidebar-toggle:hover {
-            background-color: #3e3e42;
-        }
-        
-        .sidebar-toggle.collapsed {
-            transform: translateX(0);
-        }
-        
-        .sidebar-content {
-            padding: 10px;
-            padding-top: 40px;
-        }
-        
-        .sidebar-section {
-            margin-bottom: 20px;
-        }
-        
-        .sidebar-section h6 {
-            color: #cccccc;
-            font-size: 13px;
-            text-transform: uppercase;
-            margin-bottom: 8px;
-            padding: 0 8px;
             font-weight: 600;
-            margin-top: 15px;
+            color: var(--text-highlight);
+            font-size: 16px;
         }
-        
-        .sidebar-section:first-child h6 {
-            margin-top: 0;
+
+        .brand-area i { color: var(--accent-blue); margin-right: 10px; }
+
+        .global-status-bar {
+            display: flex;
+            gap: 20px;
+            font-size: 12px;
+            font-family: 'Consolas', monospace;
         }
-        
-        .sidebar-item {
-            padding: 6px 8px;
-            cursor: pointer;
-            border-radius: 3px;
-            font-size: 13px;
-            transition: background-color 0.2s;
-        }
-        
-        .sidebar-item:hover {
-            background-color: #2a2d2e;
-        }
-        
-        /* 主内容区域调整 */
-        .main-content {
-            margin-left: 250px;
-            margin-top: 40px;
-            transition: margin-left 0.3s ease;
-            background-color: #1e1e1e;
-            min-height: calc(100vh - 40px);
-        }
-        
-        .main-content.sidebar-collapsed {
-            margin-left: 0;
-        }
-        
-        /* 深色主题样式 */
-        .main-content .card {
-            background-color: #2d2d30;
-            border: 1px solid #3e3e42;
-            color: #cccccc;
-        }
-        
-        .main-content .card-header {
-            background-color: #252526;
-            border-bottom: 1px solid #3e3e42;
-            color: #cccccc;
-        }
-        
-        .main-content .card-body {
-            background-color: #2d2d30;
-            color: #cccccc;
-        }
-        
-        .main-content .navbar {
-            background-color: #252526 !important;
-            border-bottom: 1px solid #3e3e42;
-        }
-        
-        .main-content .navbar-brand {
-            color: #cccccc !important;
-        }
-        
-        .main-content .text-light {
-            color: #cccccc !important;
-        }
-        
-        .main-content .form-control {
-            background-color: #3e3e42;
-            border: 1px solid #5a5a5a;
-            color: #cccccc;
-        }
-        
-        .main-content .form-control:focus {
-            background-color: #3e3e42;
-            border-color: #007acc;
-            color: #cccccc;
-            box-shadow: 0 0 0 0.2rem rgba(0, 122, 204, 0.25);
-        }
-        
-        .main-content .form-select {
-            background-color: #3e3e42;
-            border: 1px solid #5a5a5a;
-            color: #cccccc;
-        }
-        
-        .main-content .form-label {
-            color: #cccccc;
-        }
-        
-        .main-content .table {
-            color: #cccccc;
-        }
-        
-        .main-content .table-striped > tbody > tr:nth-of-type(odd) > td {
-            background-color: #252526;
-        }
-        
-        .main-content .text-muted {
-            color: #888888 !important;
-        }
-        
-        .main-content .btn-outline-primary {
-            color: #007acc;
-            border-color: #007acc;
-        }
-        
-        .main-content .btn-outline-primary:hover {
-            background-color: #007acc;
-            border-color: #007acc;
-            color: #ffffff;
-        }
-        
-        .main-content .btn-outline-secondary {
-            color: #888888;
-            border-color: #5a5a5a;
-        }
-        
-        .main-content .btn-outline-secondary:hover {
-            background-color: #5a5a5a;
-            border-color: #5a5a5a;
-            color: #ffffff;
-        }
-        
-        .main-content .btn-outline-success {
-            color: #28a745;
-            border-color: #28a745;
-        }
-        
-        .main-content .btn-outline-success:hover {
-            background-color: #28a745;
-            border-color: #28a745;
-            color: #ffffff;
-        }
-        
-        .main-content .nav-tabs .nav-link {
-            color: #cccccc;
-            border-color: #3e3e42;
-        }
-        
-        .main-content .nav-tabs .nav-link.active {
-            background-color: #2d2d30;
-            border-color: #3e3e42 #3e3e42 #2d2d30;
-            color: #cccccc;
-        }
-        
-        .main-content .nav-tabs .nav-link:hover {
-            border-color: #5a5a5a;
-            color: #ffffff;
-        }
-        
-        .main-content .tab-content {
-            background-color: #2d2d30;
-            border: none;
-        }
-        
-        .main-content .input-group-text {
-            background-color: #3e3e42;
-            border: 1px solid #5a5a5a;
-            color: #cccccc;
-        }
-        
-        /* 侧边栏树形结构样式 */
-        .sidebar-header {
+
+        .status-badge {
             display: flex;
             align-items: center;
+            gap: 6px;
+            background: #111;
+            padding: 4px 10px;
+            border-radius: 2px;
+            border: 1px solid var(--border-color);
+        }
+
+        .top-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-industrial {
+            background: var(--bg-panel);
+            border: 1px solid var(--border-color);
+            color: var(--text-primary);
+            padding: 4px 12px;
+            font-size: 12px;
+            border-radius: 2px;
+            transition: all 0.2s;
+        }
+        .btn-industrial:hover:not(:disabled) { background: #3e3e42; color: #fff; }
+        .btn-industrial:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-play { border-color: #2da042; color: #2da042; }
+        .btn-play:hover { background: #2da042; color: #fff; }
+        .btn-stop { border-color: var(--danger); color: var(--danger); }
+        .btn-stop:hover { background: var(--danger); color: #fff; }
+
+        /* --- 2. 主布局网格 --- */
+        .main-layout {
+            display: grid;
+            grid-template-columns: 300px 1fr 280px; /* 左侧栏, 中间视口, 右侧栏 */
+            overflow: hidden;
+            background: var(--bg-dark);
+        }
+
+        /* 通用面板样式 */
+        .panel {
+            background: var(--bg-panel);
+            border-right: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .panel:last-child { border-right: none; border-left: 1px solid var(--border-color); }
+        
+        .panel-header {
             padding: 8px 12px;
+            background: #2d2d2d;
+            border-bottom: 1px solid var(--border-color);
             font-size: 11px;
             font-weight: 600;
             text-transform: uppercase;
-            color: #cccccc;
-            border-bottom: 1px solid #3e3e42;
-            margin-bottom: 8px;
-        }
-        
-        .sidebar-header i {
-            margin-right: 8px;
-            width: 16px;
-        }
-        
-        .machine-parts-tree {
-            padding: 0 8px;
-        }
-        
-        .tree-item {
-            margin-bottom: 2px;
-        }
-        
-        .tree-node {
+            letter-spacing: 0.5px;
+            color: #aaa;
             display: flex;
+            justify-content: space-between;
             align-items: center;
-            padding: 4px 8px;
-            cursor: pointer;
-            border-radius: 3px;
-            font-size: 13px;
-            color: #cccccc;
-            transition: background-color 0.2s;
-            user-select: none;
         }
-        
-        .tree-node:hover {
-            background-color: #2a2d2e;
+
+        .panel-content {
+            padding: 10px;
+            overflow-y: auto;
+            flex: 1;
         }
-        
-        
-        .tree-arrow {
-            margin-right: 6px;
-            font-size: 10px;
-            transition: transform 0.2s;
-            width: 12px;
-            text-align: center;
+
+        /* --- 3. 左侧：数字显示(DRO)与控制 --- */
+        .dro-display {
+            background: #000;
+            border: 1px solid #444;
+            padding: 10px;
+            margin-bottom: 15px;
+            font-family: 'Consolas', 'Courier New', monospace;
         }
-        
-        .tree-arrow.expanded {
-            transform: rotate(90deg);
+
+        .dro-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid #222;
+            padding: 4px 0;
         }
+        .dro-row:last-child { border-bottom: none; }
         
-        .tree-node i:not(.tree-arrow) {
-            margin-right: 8px;
-            width: 16px;
-            text-align: center;
+        .axis-label { color: var(--accent-blue); font-weight: bold; font-size: 1.2em; }
+        .axis-value { color: var(--accent-green); font-size: 1.2em; text-align: right; }
+        
+        .control-group {
+            margin-bottom: 15px;
+            border: 1px solid var(--border-color);
+            padding: 10px;
+            background: #2b2b2b;
         }
-        
-        .tree-children {
-            margin-left: 16px;
-            display: none;
-        }
-        
-        .tree-children.expanded {
+
+        .control-group label {
+            font-size: 11px;
+            color: #888;
+            margin-bottom: 4px;
             display: block;
         }
-        
-        .status-items {
-            padding: 0 8px;
-        }
-        
-        .status-item {
-            display: flex;
-            align-items: center;
+
+        .dark-input {
+            background: #111;
+            border: 1px solid #444;
+            color: #eee;
+            width: 100%;
             padding: 4px 8px;
-            font-size: 13px;
-            color: #cccccc;
+            font-size: 12px;
+        }
+        .dark-input:focus { border-color: var(--accent-blue); outline: none; }
+
+        /* --- 4. 中间：Unity 视口 --- */
+        .viewport-area {
+            background: #111;
+            position: relative;
+            display: flex;
+            flex-direction: column;
         }
         
-        .status-item i {
-            margin-right: 8px;
-            width: 16px;
+        .viewport-toolbar {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            z-index: 100;
+            display: flex;
+            gap: 5px;
         }
-        
-        .control-items {
-            padding: 0 8px;
-        }
-        
-        /* 标签页深色主题样式 */
-        .main-content .card-header-tabs .nav-link {
-            color: #cccccc;
-            border-color: #3e3e42;
-            background-color: transparent;
-        }
-        
-        .main-content .card-header-tabs .nav-link.active {
-            background-color: #2d2d30;
-            border-color: #3e3e42 #3e3e42 #2d2d30;
-            color: #cccccc;
-        }
-        
-        .main-content .card-header-tabs .nav-link:hover {
-            border-color: #5a5a5a;
-            color: #ffffff;
-        }
-        
-        .main-content .card-header-tabs {
-            border-bottom: 1px solid #3e3e42;
-        }
-        
-        /* 标签页内容统一高度 */
-        .main-content .tab-content {
-            min-height: 240px;
-        }
-        
-        .main-content .tab-pane {
-            min-height: 240px;
-        }
-        
-        /* 响应式设计 */
-        @media (max-width: 768px) {
-            .sidebar {
-                width: 200px;
-            }
-            
-            .sidebar.collapsed {
-                transform: translateX(-200px);
-            }
-            
-            .sidebar-toggle.collapsed {
-                transform: translateX(0);
-            }
-            
-            .main-content {
-                margin-left: 200px;
-                margin-top: 40px;
-            }
-            
-            .menu-bar {
-                font-size: 12px;
-                padding: 0 5px;
-            }
-            
-            .menu-item {
-                padding: 5px 8px;
-            }
-        }
-        
-        @media (max-width: 576px) {
-            .sidebar {
-                width: 180px;
-            }
-            
-            .sidebar.collapsed {
-                transform: translateX(-180px);
-            }
-            
-            .sidebar-toggle.collapsed {
-                transform: translateX(0);
-            }
-            
-            .main-content {
-                margin-left: 180px;
-                margin-top: 40px;
-            }
-            
-            .menu-bar {
-                height: 40px;
-                font-size: 11px;
-            }
-            
-            .menu-item {
-                padding: 3px 6px;
-            }
-            
-            .sidebar-toggle {
-                height: 30px;
-                top: 40px;
-            }
-            
-            .sidebar {
-                height: calc(100vh - 40px);
-                top: 40px;
-            }
-        }
-        
-        /* 原有样式保持不变 */
-        .status-indicator {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            display: inline-block;
-            margin-right: 8px;
-        }
-        .status-connected { background-color: #28a745; }
-        .status-disconnected { background-color: #dc3545; }
-        .status-running { background-color: #007bff; }
-        .status-stopped { background-color: #6c757d; }
-        
-        .axis-control {
-            background: #3e3e42;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 10px;
-            border: 1px solid #5a5a5a;
-        }
-        
-        .position-display {
-            font-family: 'Courier New', monospace;
-            font-size: 1.2em;
-            font-weight: bold;
-            color: #007bff;
-        }
-        
-        .variable-item {
-            background: #3e3e42;
-            border: 1px solid #5a5a5a;
-            border-radius: 4px;
-            padding: 8px;
-            margin-bottom: 5px;
-            color: #cccccc;
-        }
-        
-        .log-area {
+
+        /* 强制 Unity 容器适配 Flex 布局 */
+        #unityContainer {
+            width: 100% !important;
+            height: 100% !important;
             background: #000;
-            color: #00ff00;
-            font-family: 'Courier New', monospace;
-            font-size: 0.9em;
-            height: 200px;
+            max-width: none !important;
+            max-height: none !important;
+            aspect-ratio: auto !important; /* 覆盖旧CSS */
+        }
+        
+        /* 覆盖旧的 aspect ratio 类 */
+        #unityContainer.aspect-square, 
+        #unityContainer.aspect-16-9 {
+            aspect-ratio: auto !important;
+        }
+
+        /* --- 5. 底部：日志与终端 --- */
+        .bottom-panel {
+            border-top: 1px solid var(--border-color);
+            background: var(--bg-panel);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .tab-bar {
+            display: flex;
+            background: #2d2d2d;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .tab-btn {
+            background: transparent;
+            border: none;
+            color: #888;
+            padding: 6px 15px;
+            font-size: 11px;
+            cursor: pointer;
+            border-right: 1px solid var(--border-color);
+        }
+        .tab-btn.active {
+            background: var(--bg-panel);
+            color: var(--text-highlight);
+            border-top: 2px solid var(--accent-blue);
+        }
+
+        .tab-content-area {
+            flex: 1;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        .tab-pane-custom {
+            display: none;
+            height: 100%;
             overflow-y: auto;
             padding: 10px;
-            border-radius: 4px;
         }
-        /* Unity WebGL 居中与比例控制 */
-        .unity-stage {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            width: 100%;
+        .tab-pane-custom.active { display: block; }
+
+        /* 日志样式重写 */
+        #logArea {
+            height: 100%;
+            background: #111;
+            font-family: 'Consolas', monospace;
+            padding: 5px;
+            font-size: 12px;
+            border: none;
+            color: #ddd;
         }
-        #unityContainer {
-            width: min(92vw, 1200px);
-            max-height: 50vh;
-            background: #2c2c2c;
-            border-radius: 10px;
-            box-shadow: 0 10px 24px rgba(0,0,0,0.25);
-            position: relative;
-            overflow: hidden;
-        }
-        #unityContainer.aspect-square { aspect-ratio: 1 / 1; }
-        #unityContainer.aspect-16-9 { aspect-ratio: 16 / 9; }
-        #unityContainer .unity-overlay { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); color: #fff; }
+
+        /* 树形结构微调 */
+        .tree-node { padding: 2px 0; font-size: 12px; }
+        .tree-node:hover { color: var(--text-highlight); }
+        .tree-children { margin-left: 15px; border-left: 1px solid #444; padding-left: 5px; }
+
+        /* 滚动条美化 */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1e1e1e; }
+        ::-webkit-scrollbar-thumb { background: #444; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #555; }
+
+        /* Bootstrap Modal 覆盖 (保持原有 Modal 功能但使其变暗) */
+        .modal-content { background-color: #252526; border: 1px solid #444; color: #ccc; }
+        .modal-header { border-bottom: 1px solid #444; }
+        .modal-footer { border-top: 1px solid #444; }
+        .form-control, .form-select { background-color: #333; border: 1px solid #555; color: #eee; }
+        .form-control:focus, .form-select:focus { background-color: #333; color: #fff; border-color: var(--accent-blue); box-shadow: none; }
     </style>
 </head>
 <body>
-    <!-- 菜单栏 -->
-    <div class="menu-bar">
-        <a href="#" class="app-logo">
-            <i class="fas fa-cogs"></i>
-        </a>
-        <div class="menu-item">
-            文件
-            <div class="menu-dropdown">
-                <div class="menu-dropdown-item" onclick="uploadFMU()">
-                    <i class="fas fa-file-upload"></i>上传FMU文件
-                </div>
-                <div class="menu-dropdown-item" onclick="openProject()">
-                    <i class="fas fa-folder-open"></i>打开项目
-                </div>
-                <div class="menu-dropdown-item" onclick="saveConfig()">
-                    <i class="fas fa-save"></i>保存配置
-                </div>
-                <div class="menu-dropdown-item" onclick="exportData()">
-                    <i class="fas fa-download"></i>导出数据
-                </div>
+
+    <header class="industrial-header">
+        <div class="brand-area">
+            <i class="fas fa-cube"></i> TwinCNC <span style="font-weight:normal; margin-left:10px; font-size:12px; color:#888;">v2.0 Industrial</span>
+        </div>
+
+        <div class="global-status-bar">
+            <div class="status-badge" title="服务器连接">
+                <i class="fas fa-network-wired"></i>
+                <span id="connectionStatus" class="status-indicator status-disconnected"></span>
+                <span id="connectionText">未连接</span>
+            </div>
+            <div class="status-badge" title="仿真状态">
+                <i class="fas fa-microchip"></i>
+                <span id="simulationStatus" class="status-indicator status-stopped"></span>
+                <span id="simulationText">已停止</span>
+            </div>
+            <div class="status-badge" title="仿真时间">
+                <i class="fas fa-clock"></i>
+                <span id="simulationTime">0.00 s</span>
             </div>
         </div>
-        <div class="menu-item">
-            工具
-            <div class="menu-dropdown">
-                <div class="menu-dropdown-item" onclick="showToolManagement()">
-                    <i class="fas fa-tools"></i>刀具
-                </div>
-                <div class="menu-dropdown-item" onclick="showFixtureManagement()">
-                    <i class="fas fa-grip"></i>夹具
-                </div>
+
+        <div class="top-controls">
+            <button id="startBtn" class="btn-industrial btn-play" onclick="startSimulation()">
+                <i class="fas fa-play"></i> 启动
+            </button>
+            <button id="stopBtn" class="btn-industrial btn-stop" onclick="stopSimulation()" disabled>
+                <i class="fas fa-stop"></i> 停止
+            </button>
+            <button class="btn-industrial" onclick="resetSimulation()">
+                <i class="fas fa-undo"></i> 重置
+            </button>
+            <div class="dropdown d-inline-block">
+                <button class="btn-industrial dropdown-toggle" type="button" id="menuFile" data-bs-toggle="dropdown">
+                    文件
+                </button>
+                <ul class="dropdown-menu dropdown-menu-dark">
+                    <li><a class="dropdown-item" href="#" onclick="uploadFMU()">上传 FMU</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="showSettings()">设置</a></li>
+                    <li><a class="dropdown-item" href="#" onclick="showHelp()">帮助</a></li>
+                </ul>
             </div>
         </div>
-        <div class="menu-item">
-            仿真
-            <div class="menu-dropdown">
-                <div class="menu-dropdown-item" onclick="startSimulation()">
-                    <i class="fas fa-play"></i>启动仿真
+    </header>
+
+    <div class="main-layout">
+        
+        <aside class="panel">
+            <div class="panel-header">
+                <span><i class="fas fa-tachometer-alt"></i> 数字位置 (DRO)</span>
+            </div>
+            <div class="panel-content">
+                <div class="dro-display">
+                    <div class="dro-row">
+                        <span class="axis-label">X</span>
+                        <span id="xPosition" class="axis-value">0.0000</span>
+                    </div>
+                    <div class="dro-row">
+                        <span class="axis-label">Y</span>
+                        <span id="yPosition" class="axis-value">0.0000</span>
+                    </div>
+                    <div class="dro-row">
+                        <span class="axis-label">Z</span>
+                        <span id="zPosition" class="axis-value">0.0000</span>
+                    </div>
+                    <div class="dro-row">
+                        <span class="axis-label">A</span>
+                        <span id="aPosition" class="axis-value">0.0000°</span>
+                    </div>
+                    <div class="dro-row">
+                        <span class="axis-label">C</span>
+                        <span id="cPosition" class="axis-value">0.0000°</span>
+                    </div>
                 </div>
-                <div class="menu-dropdown-item" onclick="stopSimulation()">
-                    <i class="fas fa-stop"></i>停止仿真
+
+                <div class="panel-header" style="margin: 10px -10px 10px -10px; padding-left:10px;">
+                    <span><i class="fas fa-gamepad"></i> 手动控制</span>
                 </div>
-                <div class="menu-dropdown-item" onclick="pauseSimulation()">
-                    <i class="fas fa-pause"></i>暂停仿真
+
+                <div class="control-group">
+                    <label>轴选择 / 目标位置</label>
+                    <div class="input-group input-group-sm mb-2">
+                        <select class="form-select dark-input" id="axisSelect" style="max-width: 70px;">
+                            <option value="X">X</option>
+                            <option value="Y">Y</option>
+                            <option value="Z">Z</option>
+                            <option value="A">A</option>
+                            <option value="C">C</option>
+                        </select>
+                        <input type="number" class="form-control dark-input" id="positionInput" step="0.1" value="0" placeholder="0.00">
+                    </div>
+                    <div class="d-flex gap-2">
+                        <button class="btn btn-sm btn-primary w-50" onclick="moveAxis()">移动</button>
+                        <button class="btn btn-sm btn-secondary w-50" onclick="stopAxis()">停止</button>
+                    </div>
                 </div>
-                <div class="menu-dropdown-item" onclick="resetSimulation()">
-                    <i class="fas fa-redo"></i>重置仿真
+
+                <div class="control-group">
+                    <label>仿真倍率: <span id="speedValue">1.0x</span></label>
+                    <input type="range" class="form-range" id="speedInput" min="0.1" max="5" step="0.1" value="1">
+                    <button class="btn btn-sm btn-outline-secondary w-100 mt-1" onclick="setSpeed()">设定速度</button>
+                </div>
+
+                <div class="panel-header" style="margin: 10px -10px 10px -10px; padding-left:10px;">
+                    <span><i class="fas fa-tools"></i> 配置管理</span>
+                </div>
+                <div class="d-grid gap-2">
+                    <button class="btn btn-sm btn-industrial text-start" onclick="showToolManagement()">
+                        <i class="fas fa-wrench me-2"></i> 刀具库 (Tools)
+                    </button>
+                    <button class="btn btn-sm btn-industrial text-start" onclick="showFixtureManagement()">
+                        <i class="fas fa-grip-lines me-2"></i> 夹具管理 (Fixtures)
+                    </button>
+                    <button class="btn btn-sm btn-industrial text-start" onclick="showWorkpieceManagement()">
+                        <i class="fas fa-cube me-2"></i> 工件设定 (Workpiece)
+                    </button>
                 </div>
             </div>
-        </div>
-        <div class="menu-item">
-            控制
-            <div class="menu-dropdown">
-                <div class="menu-dropdown-item" onclick="showAxisControl()">
-                    <i class="fas fa-crosshairs"></i>轴位置监控
+        </aside>
+
+        <main class="viewport-area">
+            <div class="viewport-toolbar">
+                <div class="btn-group">
+                    <button class="btn btn-sm btn-dark opacity-75" onclick="switchCamera(0)" title="主视角"><i class="fas fa-video"></i> 1</button>
+                    <button class="btn btn-sm btn-dark opacity-75" onclick="switchCamera(1)" title="俯视"><i class="fas fa-video"></i> 2</button>
                 </div>
-                <div class="menu-dropdown-item" onclick="showManualControl()">
-                    <i class="fas fa-gamepad"></i>手动控制
-                </div>
-                <div class="menu-dropdown-item" onclick="showSpeedControl()">
-                    <i class="fas fa-tachometer-alt"></i>速度设置
-                </div>
-                <div class="menu-dropdown-item" onclick="showUnityControls()">
-                    <i class="fas fa-cube"></i>3D视图控制
-                </div>
+                <button class="btn btn-sm btn-dark opacity-75" onclick="toggleUnityUI()" title="Toggle UI"><i class="fas fa-eye"></i> UI</button>
+                <button class="btn btn-sm btn-dark opacity-75" onclick="toggleUnityFullscreen()" title="Fullscreen"><i class="fas fa-expand"></i></button>
             </div>
-        </div>
-        <div class="menu-item">
-            数据
-            <div class="menu-dropdown">
-                <div class="menu-dropdown-item" onclick="showDatabaseOverview()">
-                    <i class="fas fa-database"></i>数据库概览
+            
+            <div id="unityContainer">
+                <div id="unityLoadingBar" class="text-white position-absolute top-50 start-50 translate-middle text-center">
+                    <i class="fas fa-spinner fa-spin fa-2x mb-2"></i><br>Loading 3D Engine...
                 </div>
-                <div class="menu-dropdown-item" onclick="showSessionStats()">
-                    <i class="fas fa-chart-line"></i>会话统计
-                </div>
-                <div class="menu-dropdown-item" onclick="showExternalDataSource()">
-                    <i class="fas fa-network-wired"></i>外部数据源
-                </div>
-                <div class="menu-dropdown-item" onclick="showVariables()">
-                    <i class="fas fa-list"></i>变量信息
-                </div>
+                <canvas id="unity-canvas" style="width: 100%; height: 100%; display: none;"></canvas>
             </div>
-        </div>
-        <div class="menu-item">
-            视图
-            <div class="menu-dropdown">
-                <div class="menu-dropdown-item" onclick="toggleSidebar()">
-                    <i class="fas fa-bars"></i>切换侧边栏
-                </div>
-                <div class="menu-dropdown-item" onclick="toggleUnityFullscreen()">
-                    <i class="fas fa-expand"></i>3D视图全屏
-                </div>
-                <div class="menu-dropdown-item" onclick="toggleUnityUI()">
-                    <i class="fas fa-eye"></i>切换3D UI
-                </div>
-                <div class="menu-dropdown-item" onclick="setUnityAspect('square')">
-                    <i class="fas fa-square"></i>方形视图
-                </div>
-                <div class="menu-dropdown-item" onclick="setUnityAspect('16-9')">
-                    <i class="fas fa-tv"></i>16:9视图
-                </div>
+        </main>
+
+        <aside class="panel">
+            <div class="panel-header">
+                <span><i class="fas fa-code-branch"></i> 机床结构树</span>
+                <button class="btn btn-xs btn-link text-muted" onclick="toggleSidebar()"><i class="fas fa-sync"></i></button>
             </div>
-        </div>
-        <div class="menu-item">
-            帮助
-            <div class="menu-dropdown">
-                <div class="menu-dropdown-item" onclick="showSystemLog()">
-                    <i class="fas fa-terminal"></i>系统日志
-                </div>
-                <div class="menu-dropdown-item" onclick="clearLog()">
-                    <i class="fas fa-trash"></i>清除日志
-                </div>
-                <div class="menu-dropdown-item" onclick="showSettings()">
-                    <i class="fas fa-cog"></i>设置
-                </div>
-                <div class="menu-dropdown-item" onclick="showHelp()">
-                    <i class="fas fa-question-circle"></i>帮助
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 侧边栏切换按钮 -->
-    <button class="sidebar-toggle" id="sidebarToggle" onclick="toggleSidebar()">
-        <i class="fas fa-chevron-left" id="sidebarToggleIcon"></i>
-    </button>
-    
-    <!-- 侧边栏 -->
-    <div class="sidebar" id="sidebar">
-        <div class="sidebar-content">
-            <!-- 机床部件树形结构 -->
-            <div class="sidebar-section">
-                <div class="sidebar-header">
-                    <i class="fas fa-cogs"></i>
-                    <span>机床部件</span>
-                </div>
-                <div class="machine-parts-tree">
-                    <!-- 工作台组件 -->
+            <div class="panel-content" id="sidebar"> <div class="machine-parts-tree small">
                     <div class="tree-item">
                         <div class="tree-node" onclick="toggleTreeNode('table-assembly')">
-                            <i class="fas fa-chevron-right tree-arrow" id="table-assembly-arrow"></i>
-                            <i class="fas fa-table"></i>
-                            <span>工作台组件</span>
+                            <i class="fas fa-caret-right tree-arrow" id="table-assembly-arrow"></i> 
+                            <i class="fas fa-table text-info"></i> 工作台组件
                         </div>
-                        <div class="tree-children" id="table-assembly">
-                            <div class="tree-item">
-                                <div class="tree-node" onclick="highlightPart('TableBase')">
-                                    <i class="fas fa-square"></i>
-                                    <span>工作台底座</span>
-                                </div>
-                            </div>
-                            <div class="tree-item">
-                                <div class="tree-node" onclick="highlightPart('TableX')">
-                                    <i class="fas fa-arrows-alt-h"></i>
-                                    <span>X轴移动平台</span>
-                                </div>
-                            </div>
-                            <div class="tree-item">
-                                <div class="tree-node" onclick="highlightPart('TableY')">
-                                    <i class="fas fa-arrows-alt-v"></i>
-                                    <span>Y轴移动平台</span>
-                                </div>
-                            </div>
-                            <div class="tree-item">
-                                <div class="tree-node" onclick="highlightPart('TableC')">
-                                    <i class="fas fa-sync-alt"></i>
-                                    <span>C轴转台</span>
-                                </div>
-                            </div>
-                            <div class="tree-item">
-                                <div class="tree-node" onclick="highlightPart('Workpiece')">
-                                    <i class="fas fa-cube"></i>
-                                    <span>工件</span>
-                                </div>
-                            </div>
+                        <div class="tree-children" id="table-assembly" style="display:none;">
+                            <div class="tree-node" onclick="highlightPart('TableX')">- X轴平台</div>
+                            <div class="tree-node" onclick="highlightPart('TableY')">- Y轴平台</div>
+                            <div class="tree-node" onclick="highlightPart('TableC')">- C轴转台</div>
                         </div>
                     </div>
-                    
-                    <!-- 主轴组件 -->
-                    <div class="tree-item">
+                    <div class="tree-item mt-2">
                         <div class="tree-node" onclick="toggleTreeNode('spindle-assembly')">
-                            <i class="fas fa-chevron-right tree-arrow" id="spindle-assembly-arrow"></i>
-                            <i class="fas fa-cog"></i>
-                            <span>主轴组件</span>
+                            <i class="fas fa-caret-right tree-arrow" id="spindle-assembly-arrow"></i>
+                            <i class="fas fa-cog text-warning"></i> 主轴组件
                         </div>
-                        <div class="tree-children" id="spindle-assembly">
-                            <div class="tree-item">
-                                <div class="tree-node" onclick="highlightPart('SpindleBase')">
-                                    <i class="fas fa-square"></i>
-                                    <span>主轴底座</span>
-                                </div>
-                            </div>
-                            <div class="tree-item">
-                                <div class="tree-node" onclick="highlightPart('SpindleZ')">
-                                    <i class="fas fa-arrows-alt-v"></i>
-                                    <span>Z轴主轴</span>
-                                </div>
-                            </div>
-                            <div class="tree-item">
-                                <div class="tree-node" onclick="highlightPart('HeadA')">
-                                    <i class="fas fa-sync-alt"></i>
-                                    <span>A轴摆头</span>
-                                </div>
-                            </div>
-                            <div class="tree-item">
-                                <div class="tree-node" onclick="highlightPart('SpindleMotor')">
-                                    <i class="fas fa-bolt"></i>
-                                    <span>主轴电机</span>
-                                </div>
-                            </div>
-                            <div class="tree-item">
-                                <div class="tree-node" onclick="highlightPart('Tool')">
-                                    <i class="fas fa-tools"></i>
-                                    <span>刀具</span>
-                                </div>
-                            </div>
-                            <div class="tree-item">
-                                <div class="tree-node" onclick="highlightPart('ToolTip')">
-                                    <i class="fas fa-crosshairs"></i>
-                                    <span>刀尖位置</span>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <!-- 机床框架 -->
-                    <div class="tree-item">
-                        <div class="tree-node" onclick="toggleTreeNode('machine-frame')">
-                            <i class="fas fa-chevron-right tree-arrow" id="machine-frame-arrow"></i>
-                            <i class="fas fa-building"></i>
-                            <span>机床框架</span>
-                        </div>
-                        <div class="tree-children" id="machine-frame">
-                            <div class="tree-item">
-                                <div class="tree-node" onclick="highlightPart('Columns')">
-                                    <i class="fas fa-grip-lines-vertical"></i>
-                                    <span>立柱</span>
-                                </div>
-                            </div>
-                            <div class="tree-item">
-                                <div class="tree-node" onclick="highlightPart('Base')">
-                                    <i class="fas fa-square"></i>
-                                    <span>底座</span>
-                                </div>
-                            </div>
-                            <div class="tree-item">
-                                <div class="tree-node" onclick="highlightPart('Guards')">
-                                    <i class="fas fa-shield-alt"></i>
-                                    <span>防护罩</span>
-                                </div>
-                            </div>
+                        <div class="tree-children" id="spindle-assembly" style="display:none;">
+                            <div class="tree-node">- Z轴主轴</div>
+                            <div class="tree-node">- A轴摆头</div>
                         </div>
                     </div>
                 </div>
-            </div>
-            
-            <!-- 状态监控 -->
-            <div class="sidebar-section">
-                <div class="sidebar-header">
-                    <i class="fas fa-chart-line"></i>
-                    <span>状态监控</span>
+
+                <div class="panel-header mt-3 mx-n2 px-2">
+                    <span><i class="fas fa-wave-square"></i> Z轴测试</span>
                 </div>
-                <div class="status-items">
-                    <div class="status-item">
-                        <div class="status-indicator status-disconnected"></div>
-                        <span>连接状态</span>
-                    </div>
-                    <div class="status-item">
-                        <div class="status-indicator status-stopped"></div>
-                        <span>仿真状态</span>
-                    </div>
-                    <div class="status-item">
-                        <i class="fas fa-clock"></i>
-                        <span>运行时间: 0s</span>
-                    </div>
-                </div>
-            </div>
-            
-        </div>
-    </div>
-        
-    <!-- 主内容区域 -->
-    <div class="main-content" id="mainContent">
-    <div class="container-fluid">
-        <div class="row mt-3">
-            <!-- Unity WebGL 3D视图 -->
-            <div class="col-12 mb-1" id="unity-section">
-                <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5><i class="fas fa-cube"></i> 五轴机床3D仿真</h5>
-                        <div>
-                            <button class="btn btn-sm btn-outline-primary me-2" onclick="toggleUnityFullscreen()">
-                                <i class="fas fa-expand"></i> 全屏
-                            </button>
-                            <button class="btn btn-sm btn-outline-secondary" onclick="toggleUnityUI()">
-                                <i class="fas fa-eye"></i> 切换UI
-                            </button>
-                            <div class="btn-group ms-2" role="group" aria-label="canvas-aspect">
-                                <button class="btn btn-sm btn-outline-secondary" onclick="setUnityAspect('square')">方形</button>
-                                <button class="btn btn-sm btn-outline-secondary" onclick="setUnityAspect('16-9')">16:9</button>
-                            </div>
-                            <div class="dropdown ms-2" style="display:inline-block;">
-  <button class="btn btn-sm btn-outline-info dropdown-toggle" type="button" id="cameraDropdown" data-bs-toggle="dropdown" aria-expanded="false">
-    选择视角
-  </button>
-  <ul class="dropdown-menu" aria-labelledby="cameraDropdown">
-    <li><a class="dropdown-item" href="#" onclick="switchCamera(0)">视角一</a></li>
-    <li><a class="dropdown-item" href="#" onclick="switchCamera(1)">视角二</a></li>
-  </ul>
-</div>
-                        </div>
-                    </div>
-                    <div class="card-body p-3">
-                        <div class="unity-stage d-flex justify-content-center">
-                            <div id="unityContainer" class="aspect-16-9" style="width: 80%; max-width: 800px;">
-                                <!-- Unity WebGL 内容将在这里加载 -->
-                                <div id="unityLoadingBar" class="unity-overlay">
-                                    <i class="fas fa-spinner fa-spin"></i> 正在加载3D模型...
-                                </div>
-                                <canvas id="unity-canvas" style="width: 100%; height: 100%; display: none;"></canvas>
-                            </div>
-                        </div>
-                        
-                        <!-- 状态信息 -->
-                        <div class="d-flex justify-content-end mt-2">
-                            <div class="d-flex align-items-center me-4">
-                                <span class="text-muted me-2">连接状态:</span>
-                                <span id="connectionStatus" class="status-indicator status-disconnected me-1"></span>
-                                <span id="connectionText">未连接</span>
-                            </div>
-                            <div class="d-flex align-items-center">
-                                <span class="text-muted me-2">仿真状态:</span>
-                                <span id="simulationStatus" class="status-indicator status-stopped me-1"></span>
-                                <span id="simulationText">已停止</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        
-        <!-- 标签页区域 -->
-        <div class="row">
-            <div class="col-12">
-                <div class="card">
-                    <div class="card-header">
-                        <ul class="nav nav-tabs card-header-tabs" id="mainTabs" role="tablist">
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link active" id="fmu-tab" data-bs-toggle="tab" data-bs-target="#fmu-content" type="button" role="tab">
-                                    <i class="fas fa-file-upload me-2"></i>FMU文件管理
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="axis-tab" data-bs-toggle="tab" data-bs-target="#axis-content" type="button" role="tab">
-                                    <i class="fas fa-crosshairs me-2"></i>轴位置监控
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="simulation-tab" data-bs-toggle="tab" data-bs-target="#simulation-content" type="button" role="tab">
-                                    <i class="fas fa-play-circle me-2"></i>仿真控制
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="variables-tab" data-bs-toggle="tab" data-bs-target="#variables-content" type="button" role="tab">
-                                    <i class="fas fa-list me-2"></i>变量信息
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="manual-tab" data-bs-toggle="tab" data-bs-target="#manual-content" type="button" role="tab">
-                                    <i class="fas fa-gamepad me-2"></i>手动控制
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="database-tab" data-bs-toggle="tab" data-bs-target="#database-content" type="button" role="tab">
-                                    <i class="fas fa-database me-2"></i>数据库概览
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="external-tab" data-bs-toggle="tab" data-bs-target="#external-content" type="button" role="tab">
-                                    <i class="fas fa-network-wired me-2"></i>外部数据源
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="log-tab" data-bs-toggle="tab" data-bs-target="#log-content" type="button" role="tab">
-                                    <i class="fas fa-terminal me-2"></i>系统日志
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="travel-tab" data-bs-toggle="tab" data-bs-target="#travel-content" type="button" role="tab">
-                                    <i class="fas fa-ruler me-2"></i>行程测试
-                                </button>
-                            </li>
-                            <li class="nav-item" role="presentation">
-                                <button class="nav-link" id="test-tab" data-bs-toggle="tab" data-bs-target="#test-content" type="button" role="tab">
-                                    <i class="fas fa-flask me-2"></i>测试
-                                </button>
-                            </li>
-                        </ul>
-                    </div>
-                    <div class="card-body">
-                        <div class="tab-content" id="mainTabsContent">
-                            <!-- FMU文件管理标签页 -->
-                            <div class="tab-pane fade show active" id="fmu-content" role="tabpanel">
-        <div class="row">
-                                    <div class="col-md-6 mb-3">
-                <div class="card">
-                    <div class="card-header">
-                                                <h6 class="mb-0">文件上传</h6>
-                    </div>
-                    <div class="card-body">
-                        <form id="fmuUploadForm" enctype="multipart/form-data">
-                            <div class="mb-3">
-                                <label for="fmuFile" class="form-label">选择FMU文件</label>
-                                <input type="file" class="form-control" id="fmuFile" name="fmu_file" accept=".fmu">
-                            </div>
-                                                    <div class="d-grid">
-                            <button type="submit" class="btn btn-primary">
-                                <i class="fas fa-upload"></i> 上传并加载
-                            </button>
-                                                    </div>
-                        </form>
-                        </div>
-                    </div>
-                </div>
-                                    <div class="col-md-6 mb-3">
-                                        <div class="card">
-                    <div class="card-header">
-                                                <h6 class="mb-0">模型信息</h6>
-                    </div>
-                    <div class="card-body">
-                                                <div id="modelInfo" style="display: none;">
-                                                    <div id="modelDetails"></div>
-                                </div>
-                                                <div id="modelInfoPlaceholder" class="text-muted">
-                                                    <i class="fas fa-info-circle me-2"></i>请先上传FMU文件查看模型信息
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            
-                            <!-- 轴位置监控标签页 -->
-                            <div class="tab-pane fade" id="axis-content" role="tabpanel">
-                                <div class="row">
-                                    <div class="col-md-6 col-lg-4 mb-3">
-                            <div class="axis-control">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <strong>X轴:</strong>
-                                    <span id="xPosition" class="position-display">0.0000 mm</span>
-                                </div>
-                            </div>
-                                    </div>
-                                    <div class="col-md-6 col-lg-4 mb-3">
-                            <div class="axis-control">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <strong>Y轴:</strong>
-                                    <span id="yPosition" class="position-display">0.0000 mm</span>
-                                </div>
-                            </div>
-                                    </div>
-                                    <div class="col-md-6 col-lg-4 mb-3">
-                            <div class="axis-control">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <strong>Z轴:</strong>
-                                    <span id="zPosition" class="position-display">0.0000 mm</span>
-                                </div>
-                            </div>
-                                    </div>
-                                    <div class="col-md-6 col-lg-4 mb-3">
-                            <div class="axis-control">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <strong>A轴:</strong>
-                                    <span id="aPosition" class="position-display">0.0000°</span>
-                                </div>
-                            </div>
-                                    </div>
-                                    <div class="col-md-6 col-lg-4 mb-3">
-                            <div class="axis-control">
-                                <div class="d-flex justify-content-between align-items-center">
-                                    <strong>C轴:</strong>
-                                    <span id="cPosition" class="position-display">0.0000°</span>
-                                </div>
-                            </div>
-                        </div>
+                <div class="mt-2">
+                    <label class="small text-muted">速度倍率: <span id="zAxisSpeedValue">10x</span></label>
+                    <input type="range" class="form-range" id="zAxisSpeedInput" min="10" max="50" step="1" value="10">
+                    <div class="btn-group w-100 mt-2">
+                        <button class="btn btn-sm btn-outline-success" onclick="startZAxisSMotion()">S型测试</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="stopZAxisSMotion()">停止</button>
                     </div>
                 </div>
                 
-                            <!-- 仿真控制标签页 -->
-                            <div class="tab-pane fade" id="simulation-content" role="tabpanel">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <div class="d-grid gap-2">
-                                            <button id="startBtn" class="btn btn-success" onclick="startSimulation()">
-                                                <i class="fas fa-play"></i> 启动仿真
-                                            </button>
-                                            <button id="stopBtn" class="btn btn-danger" onclick="stopSimulation()" disabled>
-                                                <i class="fas fa-stop"></i> 停止仿真
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <div class="card">
-                                            <div class="card-body text-center">
-                                                <h6 class="card-title">仿真时间</h6>
-                                                <h4 class="text-primary" id="simulationTime">0.00 s</h4>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- 变量信息标签页 -->
-                            <div class="tab-pane fade" id="variables-content" role="tabpanel">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <div class="card">
-                                            <div class="card-header">
-                                                <h6 class="mb-0">输入变量</h6>
-                                            </div>
-                                            <div class="card-body">
-                                                <div id="inputVariablesList" style="max-height: 400px; overflow-y: auto;">
-                                                    <p class="text-muted">请先加载FMU文件</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <div class="card">
-                                            <div class="card-header">
-                                                <h6 class="mb-0">输出变量</h6>
-                                            </div>
-                                            <div class="card-body">
-                                                <div id="outputVariablesList" style="max-height: 400px; overflow-y: auto;">
-                                                    <p class="text-muted">请先加载FMU文件</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            
-                            <!-- 手动控制标签页 -->
-                            <div class="tab-pane fade" id="manual-content" role="tabpanel">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <div class="card">
-                                            <div class="card-header">
-                                                <h6 class="mb-0">轴控制</h6>
-                                            </div>
-                                            <div class="card-body py-2">
-                                                <div class="mb-2">
-                                                    <label for="axisSelect" class="form-label">选择轴</label>
-                                                    <select class="form-select" id="axisSelect">
-                                                        <option value="X">X轴</option>
-                                                        <option value="Y">Y轴</option>
-                                                        <option value="Z">Z轴</option>
-                                                        <option value="A">A轴</option>
-                                                        <option value="C">C轴</option>
-                                                    </select>
-                                                </div>
-                                                <div class="mb-2">
-                                                    <label for="positionInput" class="form-label">目标位置</label>
-                                                    <input type="number" class="form-control" id="positionInput" step="0.1" value="0">
-                                                </div>
-                                                <div class="d-flex gap-2">
-                                                    <button class="btn btn-success btn-sm flex-fill" onclick="moveAxis()">
-                                                        <i class="fas fa-arrow-right"></i> 移动
-                                                    </button>
-                                                    <button class="btn btn-warning btn-sm flex-fill" onclick="stopAxis()">
-                                                        <i class="fas fa-stop"></i> 停止
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <div class="card">
-                                            <div class="card-header">
-                                                <h6 class="mb-0">速度设置</h6>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="mb-3">
-                                <label for="speedInput" class="form-label">仿真速度</label>
-                                <input type="range" class="form-range" id="speedInput" min="0.1" max="5" step="0.1" value="1">
-                                <div class="text-center">
-                                                        <span class="badge bg-primary" id="speedValue">1.0x</span>
-                                </div>
-                            </div>
-                                                <div class="d-grid">
-                                                    <button class="btn btn-info" onclick="setSpeed()">
-                                    <i class="fas fa-tachometer-alt"></i> 设置速度
-                                </button>
-                            </div>
+                <div class="panel-header mt-3 mx-n2 px-2">
+                    <span><i class="fas fa-ruler-combined"></i> 坐标系微调</span>
+                </div>
+                 <div class="mt-2 small">
+                    <div class="d-flex justify-content-between"><span>X Off:</span> <span id="correctionXValue">0</span></div>
+                    <input type="range" class="form-range" id="correctionX" min="-1" max="1" step="0.01" value="0">
+                    <div class="d-flex justify-content-between"><span>Y Off:</span> <span id="correctionYValue">0</span></div>
+                    <input type="range" class="form-range" id="correctionY" min="-1" max="1" step="0.01" value="0">
+                    <div class="d-flex justify-content-between"><span>Z Off:</span> <span id="correctionZValue">0</span></div>
+                    <input type="range" class="form-range" id="correctionZ" min="-1" max="1" step="0.01" value="0">
+                    <button class="btn btn-sm btn-secondary w-100 mt-1" onclick="applyCoordinateCorrection()">应用修正</button>
+                </div>
+
+            </div>
+        </aside>
+    </div>
+
+    <footer class="bottom-panel">
+        <div class="tab-bar">
+            <button class="tab-btn active" onclick="switchBottomTab('log')">系统日志</button>
+            <button class="tab-btn" onclick="switchBottomTab('travel')">行程测试</button>
+            <button class="tab-btn" onclick="switchBottomTab('external')">外部数据源</button>
+            <button class="tab-btn" onclick="switchBottomTab('db')">数据库</button>
+            <button class="tab-btn" onclick="switchBottomTab('fmu')">FMU 文件</button>
+            <div style="flex:1"></div>
+            <button class="tab-btn" onclick="clearLog()"><i class="fas fa-trash"></i> 清空日志</button>
+        </div>
+
+        <div class="tab-content-area">
+            <div id="tab-log" class="tab-pane-custom active">
+                <div id="logArea"></div>
+            </div>
+
+            <div id="tab-fmu" class="tab-pane-custom">
+                <div class="container-fluid">
+                     <form id="fmuUploadForm" enctype="multipart/form-data" class="d-flex gap-3 align-items-end">
+                        <div class="flex-grow-1">
+                            <label class="form-label text-muted small">选择FMU文件</label>
+                            <input type="file" class="form-control form-control-sm dark-input" id="fmuFile" name="fmu_file" accept=".fmu">
                         </div>
+                        <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-upload"></i> 上传并加载</button>
+                    </form>
+                    <div id="modelInfo" class="mt-2 text-info small"></div>
+                </div>
+            </div>
+
+            <div id="tab-travel" class="tab-pane-custom">
+                <div class="row g-2">
+                    <div class="col-md-2">
+                        <button id="startTravelTestBtn" class="btn btn-sm btn-primary w-100" onclick="startTravelTest()">开始测试</button>
+                        <button id="stopTravelTestBtn" class="btn btn-sm btn-danger w-100 mt-2" onclick="stopTravelTest()" style="display:none;">停止</button>
+                    </div>
+                    <div class="col-md-10">
+                         <div class="d-flex gap-2 mb-2 flex-wrap">
+                             <input type="number" class="dark-input" style="width:80px" id="travelXPos" value="100" placeholder="X+">
+                             <input type="number" class="dark-input" style="width:80px" id="travelXNeg" value="-100" placeholder="X-">
+                             <input type="number" class="dark-input" style="width:80px" id="travelYPos" value="100" placeholder="Y+">
+                             <input type="number" class="dark-input" style="width:80px" id="travelYNeg" value="-100" placeholder="Y-">
+                             <input type="number" class="dark-input" style="width:80px" id="travelZPos" value="100" placeholder="Z+">
+                             <input type="number" class="dark-input" style="width:80px" id="travelZNeg" value="-100" placeholder="Z-">
+                             <input type="number" class="dark-input" style="width:80px" id="travelDelay" value="3" placeholder="Delay(s)">
+                             </div>
+                         <div id="travelTestStatus" style="display:none;">
+                            <div class="progress" style="height: 5px; background:#333;">
+                                <div id="travelProgressBar" class="progress-bar bg-success" style="width: 0%"></div>
+                            </div>
+                            <small id="travelTestInfo" class="text-muted"></small>
+                         </div>
                     </div>
                 </div>
             </div>
-                        </div>
-                        
-                            <!-- 数据库概览标签页 -->
-                            <div class="tab-pane fade" id="database-content" role="tabpanel">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <div class="card">
-                    <div class="card-header d-flex justify-content-between align-items-center">
-                                                <h6 class="mb-0">当前位置</h6>
-                        <button id="dbRefreshBtn" class="btn btn-sm btn-outline-primary">刷新</button>
-                    </div>
-                    <div class="card-body">
-                            <div id="dbCurrentPositions" class="small">
-                                <span class="text-muted">等待数据...</span>
-                            </div>
-                        </div>
-                                        </div>
-                                    </div>
-                                    <div class="col-md-6 mb-3">
-                                        <div class="card">
-                                            <div class="card-header">
-                                                <h6 class="mb-0">最近会话</h6>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="table-responsive" style="max-height: 200px; overflow-y: auto;">
-                                <table class="table table-sm table-striped align-middle">
-                                    <thead>
-                                        <tr>
-                                            <th scope="col">ID</th>
-                                            <th scope="col">名称</th>
-                                            <th scope="col">状态</th>
-                                                                <th scope="col">时间</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="dbSessionsTable">
-                                                            <tr><td colspan="4" class="text-muted">暂无数据</td></tr>
-                                    </tbody>
-                                </table>
-                                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
 
-                                <div class="card" id="dbSessionStatsCard" style="display: none;">
-                                    <div class="card-header d-flex justify-content-between align-items-center">
-                        <h5 class="mb-0"><i class="fas fa-chart-line"></i> 会话统计</h5>
-                        <button id="dbCloseStatsBtn" class="btn btn-sm btn-outline-secondary">关闭</button>
-                    </div>
-                    <div class="card-body">
-                        <div id="dbSessionStats" class="small"></div>
-                                    </div>
-                    </div>
+            <div id="tab-external" class="tab-pane-custom">
+                <div class="d-flex align-items-center gap-2">
+                    <span id="externalWsIndicator" class="status-indicator status-disconnected"></span>
+                    <input type="text" class="form-control form-control-sm dark-input" id="externalWsUrl" placeholder="ws://localhost:5000/external" style="width: 300px;">
+                    <button id="externalConnectBtn" class="btn btn-sm btn-outline-success">连接</button>
+                    <button id="externalDisconnectBtn" class="btn btn-sm btn-outline-secondary">断开</button>
                 </div>
+            </div>
 
-                            <!-- 外部数据源标签页 -->
-                            <div class="tab-pane fade" id="external-content" role="tabpanel">
-                                <div class="row">
-                                    <div class="col-md-8 mb-3">
-                                        <div class="card">
-                                            <div class="card-header d-flex justify-content-between align-items-center">
-                                                <h6 class="mb-0"><i class="fas fa-network-wired"></i> 外部数据源</h6>
-                        <span class="text-muted small">
-                            <span id="externalWsIndicator" class="status-indicator status-disconnected"></span>
-                            <span id="externalWsText">未连接</span>
-                        </span>
+            <div id="tab-db" class="tab-pane-custom">
+                <button id="dbRefreshBtn" class="btn btn-sm btn-outline-primary mb-2">刷新数据</button>
+                <div class="row">
+                    <div class="col-6">
+                        <div id="dbCurrentPositions" class="small text-muted"></div>
                     </div>
-                    <div class="card-body">
-                        <label for="externalWsUrl" class="form-label">WebSocket地址</label>
-                        <div class="input-group mb-2">
-                            <input type="text" class="form-control" id="externalWsUrl" placeholder="ws://192.168.1.100:5000/external/positions">
-                                                    <button id="externalConnectBtn" class="btn btn-outline-success" type="button">
-                                <i class="fas fa-plug"></i> 连接
-                            </button>
-                            <button id="externalDisconnectBtn" class="btn btn-outline-secondary" type="button">
-                                <i class="fas fa-unlink"></i> 断开
-                            </button>
+                    <div class="col-6">
+                        <table class="table table-dark table-sm table-striped" style="font-size:11px;">
+                            <tbody id="dbSessionsTable"></tbody>
+                        </table>
+                        <div id="dbSessionStatsCard" style="display:none;">
+                             <div id="dbSessionStats" class="small text-info"></div>
+                             <button id="dbCloseStatsBtn" class="btn btn-xs btn-link">关闭统计</button>
                         </div>
-                        <div class="text-muted small">浏览器将连接该地址并转发消息到服务器</div>
-                                            </div>
-                                        </div>
-                                    </div>
-                    </div>
-                </div>
-
-                            <!-- 系统日志标签页 -->
-                            <div class="tab-pane fade" id="log-content" role="tabpanel">
-                                <div class="row">
-                                    <div class="col-md-10 mb-3">
-                                        <div class="card h-100">
-                                            <div class="card-header d-flex justify-content-between align-items-center">
-                                                <h6 class="mb-0"><i class="fas fa-terminal"></i> 系统日志</h6>
-                                                <button class="btn btn-outline-secondary btn-sm" onclick="clearLog()">
-                            <i class="fas fa-trash"></i> 清除日志
-                        </button>
-                                            </div>
-                                            <div class="card-body p-0 d-flex flex-column">
-                                                <div id="logArea" class="log-area flex-grow-1" style="height: 180px;"></div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- 行程测试标签页（独立） -->
-                            <div class="tab-pane fade" id="travel-content" role="tabpanel">
-                                <div class="row">
-                                    <div class="col-md-12 mb-2 mt-0">
-                                        <div class="card">
-                                            <div class="card-header">
-                                                <h6 class="mb-0"><i class="fas fa-ruler me-2"></i>行程测试</h6>
-                                            </div>
-                                            <div class="card-body p-1">
-                                                <div class="row">
-                                                    <!-- 左侧：轴参数区域 -->
-                                                    <div class="col-md-8">
-                                                        <div class="d-flex align-items-stretch gap-2 mb-2">
-                                                            <div class="alert alert-info mb-0 flex-grow-1" style="padding-top: 0.5rem; padding-bottom: 0.5rem; margin-bottom: 0 !important;">
-                                                                <i class="fas fa-info-circle"></i>
-                                                                测试流程：按顺序对 X/Y/Z/A/C 轴执行：正向 → 原点 → 反向 → 原点。若Unity未触发碰撞，说明满足设计行程。
-                                                            </div>
-                                                            <div class="d-flex gap-1">
-                                                                <button id="startTravelTestBtn" class="btn btn-primary" onclick="startTravelTest()" style="min-width: 120px;">
-                                                                    <i class="fas fa-play"></i> 开始行程测试
-                                                                </button>
-                                                                <button id="stopTravelTestBtn" class="btn btn-danger" onclick="stopTravelTest()" style="display: none; min-width: 120px;">
-                                                                    <i class="fas fa-stop"></i> 停止行程测试
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                        <div class="row g-2">
-                                                            <!-- 第一排：X轴、Y轴、Z轴 -->
-                                                            <div class="col-md-4">
-                                                                <label class="form-label small fw-bold mb-0">X轴 (mm)</label>
-                                                                <div class="row g-1 mb-0">
-                                                                    <div class="col-6">
-                                                                        <input type="number" class="form-control form-control-sm" id="travelXPos" placeholder="正向" value="100">
-                                                                    </div>
-                                                                    <div class="col-6">
-                                                                        <input type="number" class="form-control form-control-sm" id="travelXNeg" placeholder="反向" value="-100">
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div class="col-md-4">
-                                                                <label class="form-label small fw-bold mb-0">Y轴 (mm)</label>
-                                                                <div class="row g-1 mb-0">
-                                                                    <div class="col-6">
-                                                                        <input type="number" class="form-control form-control-sm" id="travelYPos" placeholder="正向" value="100">
-                                                                    </div>
-                                                                    <div class="col-6">
-                                                                        <input type="number" class="form-control form-control-sm" id="travelYNeg" placeholder="反向" value="-100">
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div class="col-md-4">
-                                                                <label class="form-label small fw-bold mb-0">Z轴 (mm)</label>
-                                                                <div class="row g-1 mb-0">
-                                                                    <div class="col-6">
-                                                                        <input type="number" class="form-control form-control-sm" id="travelZPos" placeholder="正向" value="100">
-                                                                    </div>
-                                                                    <div class="col-6">
-                                                                        <input type="number" class="form-control form-control-sm" id="travelZNeg" placeholder="反向" value="-100">
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            
-                                                            <!-- 第二排：A轴、C轴、每步延时 -->
-                                                            <div class="col-md-4">
-                                                                <label class="form-label small fw-bold mb-0">A轴 (°)</label>
-                                                                <div class="row g-1 mb-0">
-                                                                    <div class="col-6">
-                                                                        <input type="number" class="form-control form-control-sm" id="travelAPos" placeholder="正向" value="90">
-                                                                    </div>
-                                                                    <div class="col-6">
-                                                                        <input type="number" class="form-control form-control-sm" id="travelANeg" placeholder="反向" value="-90">
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div class="col-md-4">
-                                                                <label class="form-label small fw-bold mb-0">C轴 (°)</label>
-                                                                <div class="row g-1 mb-0">
-                                                                    <div class="col-6">
-                                                                        <input type="number" class="form-control form-control-sm" id="travelCPos" placeholder="正向" value="180">
-                                                                    </div>
-                                                                    <div class="col-6">
-                                                                        <input type="number" class="form-control form-control-sm" id="travelCNeg" placeholder="反向" value="-180">
-                                                                    </div>
-                                                                </div>
-                                                            </div>
-                                                            <div class="col-md-4">
-                                                                <label for="travelDelay" class="form-label small mb-0">每步延时 (秒)</label>
-                                                                <input type="number" class="form-control form-control-sm mb-0" id="travelDelay" value="3" min="1" max="10" step="0.5">
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    
-                                                    <!-- 右侧：进度条和状态信息区域 -->
-                                                    <div class="col-md-4">
-                                                        <div id="travelTestStatus" class="h-100" style="display: none;">
-                                                            <div class="card h-100">
-                                                                <div class="card-header py-2">
-                                                                    <h6 class="mb-0"><i class="fas fa-tasks me-2"></i>测试进度</h6>
-                                                                </div>
-                                                                <div class="card-body d-flex flex-column justify-content-center">
-                                                                    <div class="progress mb-2" style="height: 20px;">
-                                                                        <div id="travelProgressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%"></div>
-                                                                    </div>
-                                                                    <div id="travelTestInfo" class="small text-center text-muted" style="font-size: 0.85rem;"></div>
-                                                                </div>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <!-- 测试标签页 -->
-                            <div class="tab-pane fade" id="test-content" role="tabpanel">
-                                <div class="row">
-                                    <div class="col-md-6 mb-3 mt-3">
-                                        <label for="testNumberInput" class="form-label">输入数字</label>
-                                        <input type="number" class="form-control" id="testNumberInput" placeholder="请输入数字">
-                                    </div>
-                                    <div class="col-md-6 mb-3 mt-3">
-                                        <div class="card h-100">
-                                            <div class="card-header">
-                                                <h6 class="mb-0"><i class="fas fa-tools me-2"></i>刀具切换</h6>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="mb-3">
-                                                    <label for="toolSelect" class="form-label">选择刀具</label>
-                                                    <select class="form-select" id="toolSelect" onchange="switchToolWithDebug(this.value)">
-                                                        <option value="1">刀具1</option>
-                                                        <option value="2">刀具2</option>
-                                                        <option value="3">刀具3</option>
-                                                    </select>
-                                                </div>
-                                                <div class="d-grid gap-2">
-                                                    <button class="btn btn-info" type="button" onclick="switchToNextTool()">
-                                                        <i class="fas fa-arrow-right me-1"></i>切换到下一把刀具
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- 夹具切换功能 -->
-                                <div class="row mt-3">
-                                    <div class="col-md-6 mb-3">
-                                        <div class="card h-100">
-                                            <div class="card-header">
-                                                <h6 class="mb-0"><i class="fas fa-grip me-2"></i>夹具切换</h6>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="mb-3">
-                                                    <label for="fixtureSelect" class="form-label">选择夹具</label>
-                                                    <select class="form-select" id="fixtureSelect" onchange="switchFixture(this.value)">
-                                                        <option value="1">夹具1</option>
-                                                        <option value="2">夹具2</option>
-                                                        <option value="3">夹具3</option>
-                                                    </select>
-                                                </div>
-                                                <div class="row mb-3">
-                                                    <div class="col-md-4">
-                                                        <label for="fixturePosX" class="form-label">X坐标</label>
-                                                        <input type="number" class="form-control" id="fixturePosX" step="0.1" value="0">
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <label for="fixturePosY" class="form-label">Y坐标</label>
-                                                        <input type="number" class="form-control" id="fixturePosY" step="0.1" value="0">
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <label for="fixturePosZ" class="form-label">Z坐标</label>
-                                                        <input type="number" class="form-control" id="fixturePosZ" step="0.1" value="0">
-                                                    </div>
-                                                </div>
-                                                <div class="d-grid gap-2">
-                                                    <button class="btn btn-primary" type="button" onclick="setFixturePosition()">
-                                                        <i class="fas fa-arrows-alt me-1"></i>设置夹具位置
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    
-                                    <!-- 工件切换功能 -->
-                                    <div class="col-md-6 mb-3">
-                                        <div class="card h-100">
-                                            <div class="card-header">
-                                                <h6 class="mb-0"><i class="fas fa-cube me-2"></i>工件切换</h6>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="mb-3">
-                                                    <label for="workpieceSelect" class="form-label">选择工件</label>
-                                                    <select class="form-select" id="workpieceSelect" onchange="switchWorkpiece(this.value)">
-                                                        <option value="1">工件1</option>
-                                                        <option value="2">工件2</option>
-                                                        <option value="3">工件3</option>
-                                                    </select>
-                                                </div>
-                                                <div class="row mb-3">
-                                                    <div class="col-md-4">
-                                                        <label for="workpiecePosX" class="form-label">X坐标</label>
-                                                        <input type="number" class="form-control" id="workpiecePosX" step="0.1" value="0">
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <label for="workpiecePosY" class="form-label">Y坐标</label>
-                                                        <input type="number" class="form-control" id="workpiecePosY" step="0.1" value="0">
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <label for="workpiecePosZ" class="form-label">Z坐标</label>
-                                                        <input type="number" class="form-control" id="workpiecePosZ" step="0.1" value="0">
-                                                    </div>
-                                                </div>
-                                                <div class="d-grid gap-2">
-                                                    <button class="btn btn-success" type="button" onclick="setWorkpiecePosition()">
-                                                        <i class="fas fa-arrows-alt me-1"></i>设置工件位置
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="row">
-                                    <div class="col-md-6 mb-3">
-                                        <div class="card h-100">
-                                            <div class="card-header">
-                                                <h6 class="mb-0"><i class="fas fa-wave-square me-2"></i>Z轴S型运动控制</h6>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="mb-3">
-                                                    <label for="zAxisSpeedInput" class="form-label">运动速度倍率</label>
-                                                    <input type="range" class="form-range" id="zAxisSpeedInput" min="10" max="50" step="1" value="10">
-                                                    <div class="text-center">
-                                                        <span class="badge bg-info" id="zAxisSpeedValue">10x</span>
-                                                    </div>
-                                                </div>
-                                                <div class="d-grid gap-2">
-                                                    <button class="btn btn-success" type="button" onclick="startZAxisSMotion()">
-                                                        <i class="fas fa-play me-1"></i>启动S型运动
-                                                    </button>
-                                                    <button class="btn btn-warning" type="button" onclick="stopZAxisSMotion()">
-                                                        <i class="fas fa-stop me-1"></i>停止运动
-                                                    </button>
-                                                    <button class="btn btn-secondary" type="button" onclick="resetZAxisPosition()">
-                                                        <i class="fas fa-undo me-1"></i>重置位置
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                                
-                                <!-- WebGL坐标系调试面板 -->
-                                <div class="row">
-                                    <div class="col-md-12 mb-3">
-                                        <div class="card">
-                                            <div class="card-header">
-                                                <h6 class="mb-0"><i class="fas fa-crosshairs me-2"></i>WebGL坐标系调试</h6>
-                                            </div>
-                                            <div class="card-body">
-                                                <div class="row">
-                                                    <div class="col-md-4">
-                                                        <div class="mb-3">
-                                                            <label class="form-label">X轴修正值</label>
-                                                            <input type="range" class="form-range" id="correctionX" min="-1" max="1" step="0.01" value="0">
-                                                            <div class="d-flex justify-content-between">
-                                                                <small>-1.0</small>
-                                                                <span id="correctionXValue">0.00</span>
-                                                                <small>1.0</small>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <div class="mb-3">
-                                                            <label class="form-label">Y轴修正值</label>
-                                                            <input type="range" class="form-range" id="correctionY" min="-1" max="1" step="0.01" value="0">
-                                                            <div class="d-flex justify-content-between">
-                                                                <small>-1.0</small>
-                                                                <span id="correctionYValue">0.00</span>
-                                                                <small>1.0</small>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                    <div class="col-md-4">
-                                                        <div class="mb-3">
-                                                            <label class="form-label">Z轴修正值</label>
-                                                            <input type="range" class="form-range" id="correctionZ" min="-1" max="1" step="0.01" value="0">
-                                                            <div class="d-flex justify-content-between">
-                                                                <small>-1.0</small>
-                                                                <span id="correctionZValue">0.00</span>
-                                                                <small>1.0</small>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                                
-                                                <div class="row">
-                                                    <div class="col-md-12">
-                                                        <div class="d-grid gap-2 d-md-flex">
-                                                            <button type="button" class="btn btn-primary" onclick="applyCoordinateCorrection()">
-                                                                <i class="fas fa-check me-1"></i>应用修正
-                                                            </button>
-                                                            <button type="button" class="btn btn-secondary" onclick="resetCoordinateCorrection()">
-                                                                <i class="fas fa-undo me-1"></i>重置修正
-                                                            </button>
-                                                            <button type="button" class="btn btn-info" onclick="getEnvironmentInfo()">
-                                                                <i class="fas fa-info-circle me-1"></i>获取环境信息
-                                                            </button>
-                                                        </div>
-                                                        
-                                                        <div class="mt-3">
-                                                            <small class="text-muted" id="debugInfo">等待调试信息...</small>
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
                     </div>
                 </div>
             </div>
         </div>
+    </footer>
+
+    <div class="modal fade" id="toolManagementModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">刀具管理</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                     <select class="form-select mb-3" id="toolSelect" onchange="switchToolWithDebug(this.value)">
+                        <option value="1">刀具1 (平底)</option>
+                        <option value="2">刀具2 (球头)</option>
+                        <option value="3">刀具3 (钻头)</option>
+                    </select>
+                    <div id="toolModelPreview" class="border rounded p-3 text-center bg-dark"></div>
+                    <button class="btn btn-primary w-100 mt-3" onclick="switchToNextTool()">切换下一把</button>
+                </div>
+            </div>
+        </div>
     </div>
-        
+
+    <div class="modal fade" id="fixtureManagementModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">夹具配置</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <select class="form-select mb-3" id="fixtureSelect" onchange="switchFixture(this.value)">
+                        <option value="1">夹具 1</option>
+                        <option value="2">夹具 2</option>
+                    </select>
+                    <div class="row g-2">
+                        <div class="col-4"><input type="number" class="form-control" id="fixtureX" placeholder="X"></div>
+                        <div class="col-4"><input type="number" class="form-control" id="fixtureY" placeholder="Y"></div>
+                        <div class="col-4"><input type="number" class="form-control" id="fixtureZ" placeholder="Z"></div>
+                    </div>
+                    <button class="btn btn-primary w-100 mt-3" onclick="setFixturePosition()">应用位置</button>
+                </div>
+            </div>
+        </div>
     </div>
-    </div> <!-- 关闭主内容区域 -->
+
+    <div class="modal fade" id="workpieceManagementModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">工件配置</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <select class="form-select mb-3" id="workpieceSelect" onchange="switchWorkpiece(this.value)">
+                        <option value="1">工件 1</option>
+                        <option value="2">工件 2</option>
+                    </select>
+                    
+                    <h6 class="mt-2">位置设置</h6>
+                    <div class="row g-2">
+                        <div class="col-4"><input type="number" class="form-control" id="workpieceX" placeholder="X"></div>
+                        <div class="col-4"><input type="number" class="form-control" id="workpieceY" placeholder="Y"></div>
+                        <div class="col-4"><input type="number" class="form-control" id="workpieceZ" placeholder="Z"></div>
+                    </div>
+                    <button class="btn btn-primary w-100 mt-3" onclick="setWorkpiecePosition()">应用位置</button>
+                    
+                    <h6 class="mt-4">旋转设置</h6>
+                    <div class="row g-2">
+                        <div class="col-4"><input type="number" class="form-control" id="workpieceRotationX" placeholder="X旋转"></div>
+                        <div class="col-4"><input type="number" class="form-control" id="workpieceRotationY" placeholder="Y旋转"></div>
+                        <div class="col-4"><input type="number" class="form-control" id="workpieceRotationZ" placeholder="Z旋转"></div>
+                    </div>
+                    <button class="btn btn-primary w-100 mt-3" onclick="setWorkpieceRotation()">应用旋转</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
     <script src="{{ url_for('static', filename='app.js') }}"></script>
-    
-    <!-- Unity WebGL加载脚本 -->
     <script src="{{ url_for('static', filename='unity/Build/Build/Build.loader.js') }}"></script>
     <script src="{{ url_for('static', filename='unity_integration.js') }}"></script>
-    
-    <!-- 侧边栏控制脚本 -->
+
     <script>
+        // 底部 Tab 切换逻辑
+        function switchBottomTab(tabName) {
+            // 移除所有 active 类
+            document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+            document.querySelectorAll('.tab-pane-custom').forEach(pane => pane.classList.remove('active'));
+            
+            // 激活当前选中的
+            const targetPane = document.getElementById('tab-' + tabName);
+            if(targetPane) {
+                targetPane.classList.add('active');
+                // 找到触发此函数的按钮（简单处理：遍历所有按钮，如果onclick包含tabName则激活）
+                const btns = document.querySelectorAll('.tab-btn');
+                btns.forEach(btn => {
+                    if(btn.getAttribute('onclick').includes(tabName)) {
+                        btn.classList.add('active');
+                    }
+                });
+            }
+        }
+
+        // 兼容原有的 Sidebar Toggle 逻辑 (虽然现在布局变了，但保留函数防止报错)
         function toggleSidebar() {
-            const sidebar = document.getElementById('sidebar');
-            const toggle = document.getElementById('sidebarToggle');
-            const toggleIcon = document.getElementById('sidebarToggleIcon');
-            const mainContent = document.getElementById('mainContent');
+            // 简单的折叠逻辑，适配新布局
+            const mainLayout = document.querySelector('.main-layout');
+            const sidebar = document.getElementById('sidebar').parentElement;
             
-            sidebar.classList.toggle('collapsed');
-            toggle.classList.toggle('collapsed');
-            mainContent.classList.toggle('sidebar-collapsed');
-            
-            // 根据侧边栏状态切换箭头方向
-            if (sidebar.classList.contains('collapsed')) {
-                toggleIcon.className = 'fas fa-chevron-right';
+            if (sidebar.style.display === 'none') {
+                sidebar.style.display = 'flex';
+                mainLayout.style.gridTemplateColumns = '300px 1fr 280px';
             } else {
-                toggleIcon.className = 'fas fa-chevron-left';
+                sidebar.style.display = 'none';
+                mainLayout.style.gridTemplateColumns = '300px 1fr 0';
             }
         }
-        
-        // 滚动到指定区域
-        function scrollToSection(sectionId) {
-            const element = document.getElementById(sectionId);
-            if (element) {
-                element.scrollIntoView({ behavior: 'smooth' });
-            }
-        }
-        
-        // 菜单功能函数
-        function uploadFMU() {
-            document.getElementById('fmuFile').click();
-        }
-        
-        function openProject() {
-            alert('打开项目功能');
-        }
-        
-        function saveConfig() {
-            alert('保存配置功能');
-        }
-        
-        function exportData() {
-            alert('导出数据功能');
-        }
-        
-        function pauseSimulation() {
-            alert('暂停仿真功能');
-        }
-        
-        function resetSimulation() {
-            if (confirm('确定要重置仿真吗？')) {
-                alert('重置仿真功能');
-            }
-        }
-        
-        function showAxisControl() {
-            scrollToSection('control-section');
-        }
-        
-        function showManualControl() {
-            scrollToSection('control-section');
-        }
-        
-        function showSpeedControl() {
-            scrollToSection('control-section');
-        }
-        
-        function showUnityControls() {
-            scrollToSection('unity-section');
-        }
-        
-        function showDatabaseOverview() {
-            scrollToSection('data-section');
-        }
-        
-        function showSessionStats() {
-            scrollToSection('data-section');
-        }
-        
-        function showExternalDataSource() {
-            scrollToSection('data-section');
-        }
-        
-        function showVariables() {
-            scrollToSection('control-section');
-        }
-        
-        function showSystemLog() {
-            scrollToSection('data-section');
-        }
-        
-        function showSettings() {
-            alert('设置功能');
-        }
-        
-        function showHelp() {
-            alert('帮助功能');
-        }
-        
+
+        // 补丁：打开 Modal 的辅助函数 (原代码中直接使用了 new bootstrap.Modal)
+        // 这里重新定义一遍以确保新HTML结构能正常触发
         function showToolManagement() {
-            // 显示刀具管理模态框
-            const modal = new bootstrap.Modal(document.getElementById('toolManagementModal'));
+            const el = document.getElementById('toolManagementModal');
+            const modal = new bootstrap.Modal(el);
             modal.show();
-            
-            // 初始化刀具模型预览
+            // 触发原有逻辑
             const toolSelect = document.getElementById('toolSelect');
-            if (toolSelect) {
+            if (toolSelect && window.updateToolModelPreview) {
                 updateToolModelPreview(parseInt(toolSelect.value));
             }
         }
-        
+
         function showFixtureManagement() {
-            alert('夹具管理功能');
+            new bootstrap.Modal(document.getElementById('fixtureManagementModal')).show();
         }
-        
-        // 树形结构控制函数
-        function toggleTreeNode(nodeId) {
-            const children = document.getElementById(nodeId);
-            const arrow = document.getElementById(nodeId + '-arrow');
-            
-            if (children && arrow) {
-                children.classList.toggle('expanded');
-                arrow.classList.toggle('expanded');
-            }
+
+        function showWorkpieceManagement() {
+             new bootstrap.Modal(document.getElementById('workpieceManagementModal')).show();
         }
-        
-        // 部件选择函数
-        function highlightPart(partName) {
-            console.log('选中部件:', partName);
-        }
-        
-        // 初始化Unity集成（全局函数）
-        function initUnityIntegration() {
-            if (!window.unityIntegration) {
-                if (typeof UnityIntegration !== 'undefined') {
-                    window.unityIntegration = new UnityIntegration();
-                    console.log('Unity集成对象已手动初始化');
-                    return true;
-                } else {
-                    console.log('UnityIntegration类未定义');
-                    return false;
-                }
-            }
-            return true;
-        }
-        
-        // 测试Unity连接
-        function testUnityConnection() {
-            console.log('=== Unity连接测试 ===');
-            
-            // 尝试初始化Unity集成
-            if (!initUnityIntegration()) {
-                console.log('无法初始化Unity集成对象');
-                return;
-            }
-            
-            console.log('window.unityIntegration:', window.unityIntegration);
-            
-            if (window.unityIntegration) {
-                console.log('Unity集成对象存在');
-                console.log('isUnityLoaded:', window.unityIntegration.isUnityLoaded);
-                console.log('unityInstance:', window.unityIntegration.unityInstance);
-                
-                if (window.unityIntegration.unityInstance) {
-                    console.log('Unity实例存在，尝试发送测试消息...');
-                    try {
-                        // 发送测试消息
-                        window.unityIntegration.unityInstance.SendMessage('CNCMachineController', 'OnConnectionStatusChanged', 'test');
-                        console.log('测试消息发送成功');
-                    } catch (error) {
-                        console.error('发送测试消息失败:', error);
-                    }
-                } else {
-                    console.log('Unity实例不存在，可能还在加载中...');
-                }
-            } else {
-                console.log('Unity集成对象不存在');
-            }
-        }
-        
-        
-        // 快捷操作函数
-        function quickStartSimulation() {
-            startSimulation();
-        }
-        
-        function quickStopSimulation() {
-            stopSimulation();
-        }
-        
-        function quickReset() {
-            resetSimulation();
-        }
-        
-        function toggleFullscreen() {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen();
-            } else {
-                document.exitFullscreen();
-            }
-        }
-        
-        function toggleDarkMode() {
-            alert('深色模式切换功能');
-        }
-        
-        function toggleCompactMode() {
-            alert('紧凑模式切换功能');
-        }
-        
-        // 响应式处理
-        function handleResize() {
-            const sidebar = document.getElementById('sidebar');
-            const toggle = document.getElementById('sidebarToggle');
-            const toggleIcon = document.getElementById('sidebarToggleIcon');
-            const mainContent = document.getElementById('mainContent');
-            
-            if (window.innerWidth <= 576) {
-                // 小屏幕时默认收起侧边栏
-                if (!sidebar.classList.contains('collapsed')) {
-                    sidebar.classList.add('collapsed');
-                    toggle.classList.add('collapsed');
-                    mainContent.classList.add('sidebar-collapsed');
-                    toggleIcon.className = 'fas fa-chevron-right';
-                }
-            }
-        }
-        
-        // 监听窗口大小变化
-        window.addEventListener('resize', handleResize);
-        
-        // 页面加载时检查屏幕大小
-        document.addEventListener('DOMContentLoaded', function() {
-            handleResize();
+
+        function showHelp() { alert("TwinCNC v2.0\n工业仿真系统帮助文档"); }
+        function showSettings() { alert("系统设置\n(功能开发中)"); }
+
+        // 初始化
+        document.addEventListener('DOMContentLoaded', () => {
+            // 默认激活日志 Tab
+            switchBottomTab('log');
         });
     </script>
-    <script>
-// 补丁：强制禁用window/document全局keypress，防止旧脚本冲突
-window.onkeypress = null;
-document.onkeypress = null;
-</script>
-<script>
-    // 补丁：获取所有window对象的keypress监听器并移除
-    (function() {
-        // 移除所有window上的keypress监听
-        const clone = window.getEventListeners ? window.getEventListeners(window) : null;
-        if (clone && clone.keypress) {
-            clone.keypress.forEach(l => {
-                window.removeEventListener('keypress', l.listener, l.useCapture);
-            });
-        }
-        // 移除所有document上的keypress监听
-        const docClone = window.getEventListeners ? window.getEventListeners(document) : null;
-        if (docClone && docClone.keypress) {
-            docClone.keypress.forEach(l => {
-                document.removeEventListener('keypress', l.listener, l.useCapture);
-            });
-        }
-    })();
-    </script>
-    <script>
-        window.addEventListener('keypress', function(event) {
-            if (
-                event.target.tagName === 'INPUT' ||
-                event.target.tagName === 'TEXTAREA' ||
-                event.target.isContentEditable
-            ) {
-                // 阻止事件继续冒泡，防止其它插件/脚本处理
-                event.stopImmediatePropagation();
-                // 不阻止默认行为，允许输入
-                return;
-            }
-        }, true); // 捕获阶段注册（优先生效）
-        </script>
-    <script>
-// 兜底补丁：确保在输入控件内任何键盘操作（如退格、删除、方向键）都不会被全局监听器或其它脚本阻断
-window.addEventListener('keydown', function(event) {
-    var t = event.target;
-    var isInput = t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable);
-    if (isInput) {
-        // 仅阻止冒泡，让控件原生输入100%可用（不影响表单行为）
-        event.stopImmediatePropagation();
-        // 绝不阻止默认事件，确保比如退格（Backspace）、Delete等生效
-    }
-}, true); // 捕获阶段优先生效
-</script>
-    
-    <style>
-        .tool-preview-card {
-            padding: 20px;
-            text-align: center;
-            border-radius: 8px;
-            background-color: #f8f9fa;
-            border: 1px solid #dee2e6;
-        }
-        
-        .tool-icon {
-            margin-bottom: 15px;
-        }
-        
-        .tool-preview-card h6 {
-            margin-bottom: 10px;
-            color: #495057;
-        }
-        
-        .tool-preview-card p {
-            margin-bottom: 0;
-            line-height: 1.4;
-        }
-        
-        /* 刀具管理模态框深色主题 */
-        #toolManagementModal .modal-content {
-            background-color: #2d2d30;
-            border: 1px solid #3e3e42;
-            color: #cccccc;
-        }
-        
-        #toolManagementModal .modal-header {
-            background-color: #252526;
-            border-bottom: 1px solid #3e3e42;
-        }
-        
-        #toolManagementModal .modal-title {
-            color: #cccccc;
-        }
-        
-        #toolManagementModal .modal-body {
-            background-color: #2d2d30;
-        }
-        
-        #toolManagementModal .modal-footer {
-            background-color: #252526;
-            border-top: 1px solid #3e3e42;
-        }
-        
-        #toolManagementModal .btn-close {
-            filter: invert(1);
-        }
-        
-        #toolManagementModal .form-label {
-            color: #cccccc;
-        }
-        
-        #toolManagementModal .form-select,
-        #toolManagementModal .form-control {
-            background-color: #3c3c3c;
-            border: 1px solid #4a4a4a;
-            color: #cccccc;
-        }
-        
-        #toolManagementModal .form-select:focus,
-        #toolManagementModal .form-control:focus {
-            background-color: #4a4a4a;
-            border-color: #007acc;
-            color: #ffffff;
-            box-shadow: 0 0 0 0.2rem rgba(0, 122, 204, 0.25);
-        }
-        
-        #toolManagementModal .card {
-            background-color: #252526;
-            border: 1px solid #3e3e42;
-        }
-        
-        #toolManagementModal .card-header {
-            background-color: #1e1e1e;
-            border-bottom: 1px solid #3e3e42;
-        }
-        
-        #toolManagementModal .card-title {
-            color: #cccccc;
-        }
-        
-        #toolManagementModal .card-body {
-            background-color: #252526;
-        }
-        
-        #toolManagementModal .text-muted {
-            color: #8a8a8a !important;
-        }
-        
-        #toolManagementModal .btn-primary {
-            background-color: #007acc;
-            border-color: #007acc;
-        }
-        
-        #toolManagementModal .btn-primary:hover {
-            background-color: #005a9e;
-            border-color: #005a9e;
-        }
-        
-        #toolManagementModal .btn-secondary {
-            background-color: #6c757d;
-            border-color: #6c757d;
-        }
-        
-        #toolManagementModal .btn-secondary:hover {
-            background-color: #5a6268;
-            border-color: #545b62;
-        }
-    </style>
-    
-    <!-- 刀具管理模态框 -->
-    <div class="modal fade" id="toolManagementModal" tabindex="-1" aria-labelledby="toolManagementModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="toolManagementModalLabel">刀具管理</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="toolSelect" class="form-label">选择刀具</label>
-                                <select class="form-select" id="toolSelect" onchange="switchToolWithDebug(this.value)">
-                                    <option value="1">刀具1</option>
-                                    <option value="2">刀具2</option>
-                                    <option value="3">刀具3</option>
-                                </select>
-                            </div>
-                            <div class="mb-3">
-                                <button class="btn btn-primary" onclick="switchToNextTool()">切换到下一把刀具</button>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h6 class="card-title mb-0">刀具信息预览</h6>
-                                </div>
-                                <div class="card-body">
-                                    <div id="toolModelPreview" class="text-center">
-                                        <p class="text-muted">选择刀具后显示对应的Unity模型</p>
-                                        <!-- Unity刀具模型将在这里显示 -->
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 夹具管理模态框 -->
-    <div class="modal fade" id="fixtureManagementModal" tabindex="-1" aria-labelledby="fixtureManagementModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="fixtureManagementModalLabel">夹具管理</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="fixtureSelect" class="form-label">选择夹具</label>
-                                <select class="form-select" id="fixtureSelect" onchange="switchFixture(this.value)">
-                                    <option value="1">夹具1</option>
-                                    <option value="2">夹具2</option>
-                                    <option value="3">夹具3</option>
-                                </select>
-                            </div>
-                            <div class="card">
-                                <div class="card-header">
-                                    <h6 class="card-title mb-0">夹具位置调整</h6>
-                                </div>
-                                <div class="card-body">
-                                    <div class="row">
-                                        <div class="col-md-4">
-                                            <div class="mb-3">
-                                                <label for="fixtureX" class="form-label">X坐标</label>
-                                                <input type="number" class="form-control" id="fixtureX" placeholder="输入X坐标">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="mb-3">
-                                                <label for="fixtureY" class="form-label">Y坐标</label>
-                                                <input type="number" class="form-control" id="fixtureY" placeholder="输入Y坐标">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="mb-3">
-                                                <label for="fixtureZ" class="form-label">Z坐标</label>
-                                                <input type="number" class="form-control" id="fixtureZ" placeholder="输入Z坐标">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <button class="btn btn-primary w-100" onclick="setFixturePosition()">设置位置</button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h6 class="card-title mb-0">夹具模型预览</h6>
-                                </div>
-                                <div class="card-body">
-                                    <div id="fixtureModelPreview" class="text-center">
-                                        <p class="text-muted">选择夹具后显示对应的Unity模型</p>
-                                        <!-- Unity夹具模型将在这里显示 -->
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
-                </div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 工件管理模态框 -->
-    <div class="modal fade" id="workpieceManagementModal" tabindex="-1" aria-labelledby="workpieceManagementModalLabel" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="workpieceManagementModalLabel">工件管理</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="row">
-                        <div class="col-md-6">
-                            <div class="mb-3">
-                                <label for="workpieceSelect" class="form-label">选择工件</label>
-                                <select class="form-select" id="workpieceSelect" onchange="switchWorkpiece(this.value)">
-                                    <option value="1">工件1</option>
-                                    <option value="2">工件2</option>
-                                    <option value="3">工件3</option>
-                                </select>
-                            </div>
-                            <div class="card">
-                                <div class="card-header">
-                                    <h6 class="card-title mb-0">工件位置调整</h6>
-                                </div>
-                                <div class="card-body">
-                                    <div class="row">
-                                        <div class="col-md-4">
-                                            <div class="mb-3">
-                                                <label for="workpieceX" class="form-label">X坐标</label>
-                                                <input type="number" class="form-control" id="workpieceX" placeholder="输入X坐标">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="mb-3">
-                                                <label for="workpieceY" class="form-label">Y坐标</label>
-                                                <input type="number" class="form-control" id="workpieceY" placeholder="输入Y坐标">
-                                            </div>
-                                        </div>
-                                        <div class="col-md-4">
-                                            <div class="mb-3">
-                                                <label for="workpieceZ" class="form-label">Z坐标</label>
-                                                <input type="number" class="form-control" id="workpieceZ" placeholder="输入Z坐标">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <button class="btn btn-primary w-100" onclick="setWorkpiecePosition()">设置位置</button>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="col-md-6">
-                            <div class="card">
-                                <div class="card-header">
-                                    <h6 class="card-title mb-0">工件模型预览</h6>
-                                </div>
-                                <div class="card-body">
-                                    <div id="workpieceModelPreview" class="text-center">
-                                        <p class="text-muted">选择工件后显示对应的Unity模型</p>
-                                        <!-- Unity工件模型将在这里显示 -->
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">关闭</button>
-                </div>
-            </div>
-        </div>
-    </div>
 </body>
 </html>
